@@ -1,0 +1,13 @@
+# Arquivo de configuração com chaves secretas
+src/config.js
+
+# Arquivos de ambiente padrão
+.env
+.env.local
+
+# Pasta de dependências (boa prática para o futuro)
+node_modules/
+
+# Pasta de arquivos gerados (boa prática para o futuro)
+dist/
+build/
