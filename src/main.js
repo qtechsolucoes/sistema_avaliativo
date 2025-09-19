@@ -1,4 +1,4 @@
-// src/main.js
+// src/main.js - VERSÃO CORRIGIDA
 
 // --- IMPORTAÇÕES DOS MÓDULOS ---
 import { dom, updateState } from './state.js';
@@ -10,6 +10,13 @@ import { initializeTeacherArea } from './teacher.js';
 import './adaptation.js'; // Importa o módulo para que seja incluído no build offline
 
 // ===================================================================================
+// CONFIGURAÇÕES GLOBAIS
+// ===================================================================================
+
+// CORREÇÃO: Senha padronizada para todo o sistema
+const ADMIN_PASSWORD = "admin123";
+
+// ===================================================================================
 // FUNÇÃO DE REINICIALIZAÇÃO E BLOQUEIO
 // ===================================================================================
 
@@ -17,6 +24,8 @@ import './adaptation.js'; // Importa o módulo para que seja incluído no build 
  * Reseta o estado da aplicação para o início, mostrando a tela de login.
  */
 function resetApp() {
+    console.log('Resetando aplicação...');
+    
     updateState({
         currentStudent: {},
         currentAssessment: {},
@@ -35,22 +44,27 @@ function resetApp() {
     dom.login.studentSelect.disabled = true;
     dom.login.startBtn.disabled = true;
     dom.login.errorMessage.classList.add('hidden');
-    // ADICIONADO: Garante que a legenda também seja escondida ao resetar
-    dom.login.adaptationLegend.classList.add('hidden');
+    
+    // CORREÇÃO: Garante que a legenda seja escondida ao resetar
+    if (dom.login.adaptationLegend) {
+        dom.login.adaptationLegend.classList.add('hidden');
+    }
 
     showScreen('login');
 }
 
 /**
- * Função para desbloquear o dispositivo.
+ * CORRIGIDA: Função para desbloquear o dispositivo com senha padronizada.
  */
 function unlockDevice() {
     const password = prompt("Para desbloquear, insira a senha do administrador:");
-    if (password === "admin123") {
+    
+    // CORREÇÃO: Usa a mesma senha do sistema
+    if (password === ADMIN_PASSWORD) {
         localStorage.removeItem('deviceLocked');
         alert("Dispositivo desbloqueado com sucesso!");
         resetApp();
-    } else if (password) {
+    } else if (password !== null) { // Verifica se não foi cancelado
         alert("Senha incorreta.");
     }
 }
@@ -63,26 +77,41 @@ function unlockDevice() {
  * Função principal que configura e inicia a aplicação.
  */
 function initializeApp() {
-    initializeLoginScreen(startAssessmentFlow);
-    initializeQuizScreen();
-    setupModalListeners(finishAssessment);
-    setupSidebarListeners();
-    initializeTeacherArea(resetApp);
+    console.log('Inicializando aplicação...');
+    
+    try {
+        // Inicializa todos os módulos
+        initializeLoginScreen(startAssessmentFlow);
+        initializeQuizScreen();
+        setupModalListeners(finishAssessment);
+        setupSidebarListeners();
+        initializeTeacherArea(resetApp, ADMIN_PASSWORD); // CORREÇÃO: Passa senha para teacher.js
 
-    dom.results.backToStartBtn.addEventListener('click', () => {
-        showScreen('locked');
-    });
+        // Configura listeners dos botões
+        dom.results.backToStartBtn.addEventListener('click', () => {
+            showScreen('locked');
+        });
 
-    dom.locked.unlockBtn.addEventListener('click', unlockDevice);
+        dom.locked.unlockBtn.addEventListener('click', unlockDevice);
 
-    const isDeviceLocked = localStorage.getItem('deviceLocked') === 'true';
-    if (isDeviceLocked) {
-        showScreen('locked');
-    } else {
-        resetApp();
+        // CORREÇÃO: Verifica estado inicial do dispositivo
+        const isDeviceLocked = localStorage.getItem('deviceLocked') === 'true';
+        
+        if (isDeviceLocked) {
+            console.log('Dispositivo bloqueado, mostrando tela de desbloqueio');
+            showScreen('locked');
+        } else {
+            console.log('Dispositivo livre, iniciando tela de login');
+            resetApp();
+        }
+        
+        console.log('Aplicação inicializada com sucesso');
+        
+    } catch (error) {
+        console.error('Erro crítico na inicialização:', error);
+        alert('Erro ao inicializar a aplicação. Recarregue a página.');
     }
 }
 
 // --- PONTO DE ENTRADA ---
 document.addEventListener('DOMContentLoaded', initializeApp);
-
