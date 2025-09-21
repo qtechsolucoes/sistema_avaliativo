@@ -1,13 +1,11 @@
-// src/database.js - VERSÃO CORRIGIDA
-
-// src/database.js - VERSÃO CORRIGIDA COM MELHOR DEBUG
+// src/database.js - VERSÃO COMPLETA CORRIGIDA
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
 let supabaseClient;
 const { createClient } = supabase;
 
-// CORREÇÃO: Debug detalhado da inicialização
+// Debug detalhado da inicialização
 console.log('=== INICIALIZANDO SUPABASE ===');
 console.log('URL fornecida:', SUPABASE_URL);
 console.log('Key fornecida:', SUPABASE_ANON_KEY ? `${SUPABASE_ANON_KEY.substring(0, 20)}...` : 'NÃO FORNECIDA');
@@ -109,7 +107,7 @@ export async function getClassesByGrade(grade, periodName = "3º Bimestre", year
 }
 
 /**
- * NOVA FUNÇÃO: Cria turmas mock para funcionamento offline
+ * Cria turmas mock para funcionamento offline
  */
 function createMockClasses(grade) {
     return [
@@ -130,7 +128,6 @@ export async function getStudentsByClass(classId) {
     }
     
     try {
-        // CORREÇÃO: Query melhorada com melhor tratamento de erros
         const { data, error } = await supabaseClient
             .from('class_enrollments')
             .select(`
@@ -145,13 +142,11 @@ export async function getStudentsByClass(classId) {
 
         if (error) throw error;
         
-        // CORREÇÃO: Validação robusta dos dados retornados
         if (!data || data.length === 0) {
             console.warn('Nenhum aluno encontrado para a turma, usando dados mock');
             return createMockStudents(classId);
         }
 
-        // CORREÇÃO: Filtra e valida dados antes de retornar
         const validStudents = data
             .map(enrollment => enrollment.students)
             .filter(student => student && student.id && student.full_name);
@@ -165,7 +160,7 @@ export async function getStudentsByClass(classId) {
 }
 
 /**
- * NOVA FUNÇÃO: Cria alunos mock baseados na estrutura real do banco
+ * Cria alunos mock baseados na estrutura real do banco
  */
 function createMockStudents(classId) {
     const baseStudents = [
@@ -276,7 +271,6 @@ export async function getAssessmentData(grade, disciplineName = 'Artes', periodN
             return createMockAssessment(grade, disciplineName);
         }
 
-        // CORREÇÃO: Valida e processa as questões
         const validQuestions = questionsData
             .map(q => q.questions)
             .filter(question => question && question.id && question.question_text)
@@ -301,13 +295,12 @@ export async function getAssessmentData(grade, disciplineName = 'Artes', periodN
 }
 
 /**
- * NOVA FUNÇÃO: Processa as opções das questões para garantir estrutura correta
+ * Processa as opções das questões para garantir estrutura correta
  */
 function processQuestionOptions(question) {
     let options = [];
     
     try {
-        // Se options for string JSON, faz parse
         if (typeof question.options === 'string') {
             options = JSON.parse(question.options);
         } else if (Array.isArray(question.options)) {
@@ -320,7 +313,6 @@ function processQuestionOptions(question) {
             ];
         }
         
-        // CORREÇÃO: Garante que há pelo menos uma opção correta
         const hasCorrectOption = options.some(opt => opt.isCorrect === true);
         if (!hasCorrectOption && options.length > 0) {
             options[0].isCorrect = true;
@@ -339,7 +331,7 @@ function processQuestionOptions(question) {
 }
 
 /**
- * NOVA FUNÇÃO: Cria avaliação mock para funcionamento offline
+ * Cria avaliação mock para funcionamento offline
  */
 function createMockAssessment(grade, disciplineName) {
     return {
@@ -386,7 +378,7 @@ function createMockAssessment(grade, disciplineName) {
 }
 
 // ===================================================================================
-// FUNÇÕES DE SALVAMENTO DE RESULTADOS - CORRIGIDAS
+// FUNÇÕES DE SALVAMENTO DE RESULTADOS
 // ===================================================================================
 
 /**
@@ -395,7 +387,6 @@ function createMockAssessment(grade, disciplineName) {
  * @returns {Promise<object>} - Um objeto indicando o estado da operação.
  */
 export async function saveSubmission(submissionData) {
-    // CORREÇÃO: Validação completa dos dados antes do salvamento
     const validationResult = validateSubmissionData(submissionData);
     if (!validationResult.isValid) {
         console.error('Dados de submissão inválidos:', validationResult.errors);
@@ -407,7 +398,6 @@ export async function saveSubmission(submissionData) {
     }
 
     try {
-        // CORREÇÃO: Chama a função RPC com dados validados
         const { error } = await supabaseClient.rpc('submit_assessment', {
             p_student_id: submissionData.studentId,
             p_assessment_id: submissionData.assessmentId,
@@ -424,7 +414,6 @@ export async function saveSubmission(submissionData) {
             throw error;
         }
 
-        // CORREÇÃO: Remove dados locais após sucesso online
         removeFromPendingResults(submissionData);
         
         return { success: true, synced: true, error: null };
@@ -436,7 +425,7 @@ export async function saveSubmission(submissionData) {
 }
 
 /**
- * NOVA FUNÇÃO: Validação robusta dos dados de submissão
+ * Validação robusta dos dados de submissão
  */
 function validateSubmissionData(data) {
     const errors = [];
@@ -476,13 +465,12 @@ function validateSubmissionData(data) {
 }
 
 /**
- * NOVA FUNÇÃO: Salvamento offline melhorado
+ * Salvamento offline melhorado
  */
 function saveSubmissionOffline(submissionData) {
     try {
         const localResults = JSON.parse(localStorage.getItem('pending_results') || '[]');
         
-        // CORREÇÃO: Verifica duplicatas locais
         const isDuplicate = localResults.some(result => 
             result.studentId === submissionData.studentId && 
             result.assessmentId === submissionData.assessmentId
@@ -492,7 +480,6 @@ function saveSubmissionOffline(submissionData) {
             return { success: false, synced: false, error: 'duplicate_local' };
         }
         
-        // Adiciona timestamp para controle
         const dataWithTimestamp = {
             ...submissionData,
             localTimestamp: Date.now()
@@ -510,7 +497,7 @@ function saveSubmissionOffline(submissionData) {
 }
 
 /**
- * NOVA FUNÇÃO: Remove submissão dos dados pendentes
+ * Remove submissão dos dados pendentes
  */
 function removeFromPendingResults(submissionData) {
     try {
@@ -526,7 +513,7 @@ function removeFromPendingResults(submissionData) {
 }
 
 // ===================================================================================
-// FUNÇÕES PARA O PAINEL DO PROFESSOR - CORRIGIDAS
+// FUNÇÕES PARA O PAINEL DO PROFESSOR
 // ===================================================================================
 
 /**
@@ -563,7 +550,6 @@ export async function getAllSubmissionsForDashboard() {
 
         if (error) throw error;
         
-        // CORREÇÃO: Filtra dados inválidos
         const validSubmissions = (data || []).filter(submission => 
             submission.students && 
             submission.assessments && 
@@ -580,7 +566,7 @@ export async function getAllSubmissionsForDashboard() {
 }
 
 /**
- * NOVA FUNÇÃO: Busca submissões locais para modo offline
+ * Busca submissões locais para modo offline
  */
 function getLocalSubmissions() {
     try {
@@ -645,7 +631,7 @@ export async function getSubmissionAnswers(submissionId) {
 }
 
 /**
- * NOVA FUNÇÃO: Cria respostas mock para submissões locais
+ * Cria respostas mock para submissões locais
  */
 function createMockAnswers(submissionId) {
     return [
@@ -671,11 +657,106 @@ function createMockAnswers(submissionId) {
 }
 
 // ===================================================================================
-// NOVAS FUNÇÕES: UTILITÁRIOS E SINCRONIZAÇÃO
+// FUNÇÕES PARA GERAÇÃO DE ARQUIVO OFFLINE
 // ===================================================================================
 
 /**
- * NOVA FUNÇÃO: Sincroniza todos os dados pendentes
+ * Busca todos os alunos de todas as turmas
+ * Função necessária para o gerador offline
+ */
+export async function getAllStudentsFromAllClasses() {
+    const allStudents = [];
+    const grades = [6, 7, 8, 9];
+    
+    for (const grade of grades) {
+        try {
+            const classes = await getClassesByGrade(grade);
+            
+            for (const cls of classes) {
+                const students = await getStudentsByClass(cls.id);
+                
+                students.forEach(student => {
+                    allStudents.push({
+                        ...student,
+                        grade: grade,
+                        classId: cls.id,
+                        className: cls.name
+                    });
+                });
+            }
+        } catch (error) {
+            console.error(`Erro ao buscar alunos do ${grade}º ano:`, error);
+        }
+    }
+    
+    console.log(`Total de alunos coletados: ${allStudents.length}`);
+    return allStudents;
+}
+
+/**
+ * Busca todas as turmas de todos os anos
+ * Função necessária para o gerador offline
+ */
+export async function getAllClassesFromAllGrades() {
+    const allClasses = [];
+    const grades = [6, 7, 8, 9];
+    
+    for (const grade of grades) {
+        try {
+            const classes = await getClassesByGrade(grade);
+            
+            classes.forEach(cls => {
+                allClasses.push({
+                    ...cls,
+                    grade: grade
+                });
+            });
+        } catch (error) {
+            console.error(`Erro ao buscar turmas do ${grade}º ano:`, error);
+        }
+    }
+    
+    console.log(`Total de turmas coletadas: ${allClasses.length}`);
+    return allClasses;
+}
+
+/**
+ * Busca todas as avaliações de todos os anos
+ * Função necessária para o gerador offline
+ */
+export async function getAllAssessmentsData() {
+    const allAssessments = [];
+    const grades = [6, 7, 8, 9];
+    const disciplines = ['Artes']; // Adicione mais disciplinas conforme necessário no seu banco
+    
+    for (const grade of grades) {
+        for (const discipline of disciplines) {
+            try {
+                const assessment = await getAssessmentData(grade, discipline);
+                
+                if (assessment) {
+                    allAssessments.push({
+                        ...assessment,
+                        grade: grade,
+                        discipline: discipline
+                    });
+                }
+            } catch (error) {
+                console.error(`Erro ao buscar avaliação ${discipline} - ${grade}º ano:`, error);
+            }
+        }
+    }
+    
+    console.log(`Total de avaliações coletadas: ${allAssessments.length}`);
+    return allAssessments;
+}
+
+// ===================================================================================
+// FUNÇÕES DE SINCRONIZAÇÃO
+// ===================================================================================
+
+/**
+ * Sincroniza todos os dados pendentes
  */
 export async function syncPendingSubmissions() {
     if (!supabaseClient) {
@@ -720,7 +801,7 @@ export async function syncPendingSubmissions() {
 }
 
 /**
- * NOVA FUNÇÃO: Limpa dados locais antigos
+ * Limpa dados locais antigos
  */
 export function cleanOldLocalData(maxAge = 7 * 24 * 60 * 60 * 1000) { // 7 dias
     try {
