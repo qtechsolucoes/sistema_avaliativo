@@ -48,7 +48,8 @@ export function initializeSupabase() {
         });
 
         // Inicializa sessão anônima se não houver usuário
-        initializeAnonymousSession(supabaseClient);
+        // COMENTADO: Sistema funciona perfeitamente com Security Definer nas funções RPC
+        // initializeAnonymousSession(supabaseClient);
 
         return supabaseClient;
     } catch (error) {
@@ -122,8 +123,12 @@ async function initializeAnonymousSession(client) {
             if (error) {
                 console.warn('⚠️ Autenticação anônima falhou:', error.message);
                 console.log('💡 Sugestão: Habilite autenticação anônima no Supabase ou desabilite RLS');
+                console.log('📌 Sistema continuará funcionando, mas algumas operações podem falhar');
+                // Não retorna erro - permite que o sistema continue
+                return false; // Indica que autenticação falhou, mas sistema pode continuar
             } else {
                 console.log('✅ Sessão anônima criada com sucesso');
+                return true; // Indica que autenticação foi bem-sucedida
             }
         } else {
             console.log('✅ Sessão existente encontrada');

@@ -83,6 +83,18 @@ export class DashboardManager {
         });
     }
 
+    showYearComparison() {
+        // Implementação temporária - funcionalidade de comparação de anos
+        logService.info('Comparação de anos solicitada - usando filtro normal como fallback');
+        this.applyFilters('all', 'all');
+    }
+
+    showClassComparison(yearFilter) {
+        // Implementação temporária - funcionalidade de comparação de classes
+        logService.info('Comparação de classes solicitada - usando filtro normal como fallback', { year: yearFilter });
+        this.applyFilters(yearFilter, 'all');
+    }
+
     showLoadingState() {
         if (dom.dashboard.tableBody) {
             dom.dashboard.tableBody.innerHTML = `

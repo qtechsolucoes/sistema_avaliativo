@@ -99,6 +99,197 @@ h1, h2, h3 {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
+/* Estilos para estudantes com necessidades especiais */
+.form-select option[data-has-adaptation="true"] {
+    background-color: #fef3c7; /* yellow-100 */
+    color: #92400e; /* yellow-800 */
+    font-weight: 600;
+}
+
+.student-adaptation-indicator {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b); /* yellow-400 to yellow-500 */
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+.student-adaptation-legend {
+    background: linear-gradient(135deg, #fef3c7, #fde68a); /* yellow-100 to yellow-200 */
+    border: 1px solid #fbbf24; /* yellow-400 */
+    color: #92400e; /* yellow-800 */
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.student-adaptation-legend .icon {
+    flex-shrink: 0;
+    font-size: 1.125rem;
+}
+
+/* Estilos para interfaces adaptadas */
+.adaptive-interface {
+    font-size: 1.125rem;
+    line-height: 1.8;
+}
+
+.adaptive-interface.large-text {
+    font-size: 1.5rem;
+    line-height: 2;
+}
+
+.adaptive-interface.extra-large-text {
+    font-size: 1.75rem;
+    line-height: 2.2;
+}
+
+.adaptive-high-contrast {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+}
+
+.adaptive-high-contrast .card {
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    color: #000000 !important;
+    border: 3px solid #000000 !important;
+}
+
+/* Drag and Drop adaptado */
+.drag-item {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    padding: 1rem;
+    border-radius: 12px;
+    cursor: grab;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.drag-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+}
+
+.drag-item.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+}
+
+.drop-target {
+    border: 3px dashed #cbd5e1;
+    border-radius: 12px;
+    min-height: 100px;
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.drop-target.drag-over {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    transform: scale(1.05);
+}
+
+.drop-target.correct-drop {
+    border-color: #10b981;
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    animation: successPulse 0.6s ease-out;
+}
+
+@keyframes successPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+/* Opções de quiz simplificado */
+.simple-quiz-option {
+    font-size: 1.25rem !important;
+    padding: 1.5rem !important;
+    margin: 1rem 0 !important;
+    min-height: 80px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    border-radius: 12px !important;
+    border: 3px solid #e2e8f0 !important;
+    background: linear-gradient(135deg, #f8fafc, #ffffff) !important;
+    transition: all 0.3s ease !important;
+}
+
+.simple-quiz-option:hover {
+    border-color: #3b82f6 !important;
+    background: linear-gradient(135deg, #dbeafe, #f0f9ff) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2) !important;
+}
+
+.simple-quiz-option.selected {
+    border-color: #10b981 !important;
+    background: linear-gradient(135deg, #d1fae5, #ecfdf5) !important;
+    color: #047857 !important;
+    font-weight: 600 !important;
+}
+
+/* Adaptação para TEA e TDAH */
+.reduced-stimuli {
+    background: #f8fafc !important;
+}
+
+.reduced-stimuli .card {
+    background: rgba(255, 255, 255, 0.98) !important;
+    border: 2px solid #e2e8f0 !important;
+}
+
+.reduced-stimuli h1, .reduced-stimuli h2 {
+    color: #475569 !important;
+    font-weight: 500 !important;
+}
+
+/* Gamificação para Down e Deficiência Intelectual */
+.gamified-interface {
+    background: linear-gradient(135deg, #fef3c7, #fde68a, #f59e0b) !important;
+}
+
+.gamified-interface .card {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border: 3px solid #f59e0b !important;
+    border-radius: 20px !important;
+}
+
+.reward-animation {
+    animation: celebration 1s ease-out;
+}
+
+@keyframes celebration {
+    0% { transform: scale(1) rotate(0deg); }
+    25% { transform: scale(1.1) rotate(-5deg); }
+    50% { transform: scale(1.2) rotate(5deg); }
+    75% { transform: scale(1.1) rotate(-2deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
 .option-btn { 
     display: block; 
     width: 100%; 

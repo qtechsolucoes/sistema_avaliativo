@@ -104,7 +104,7 @@ export class DashboardTable {
             this.formatDuration(result.total_duration_seconds) : 'N/A';
         
         return {
-            studentName: result.students?.full_name || 'Desconhecido',
+            studentName: result.student_name || 'Desconhecido',
             hasAdaptation: false, // Pode ser verificado nos dados do aluno
             year,
             className,
@@ -153,8 +153,8 @@ export class DashboardTable {
                 break;
                 
             case 'name':
-                sorted.sort((a, b) => 
-                    a.students?.full_name?.localeCompare(b.students?.full_name || '')
+                sorted.sort((a, b) =>
+                    (a.student_name || '').localeCompare(b.student_name || '')
                 );
                 break;
                 

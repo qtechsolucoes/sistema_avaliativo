@@ -125,13 +125,20 @@ async function populateStudents(classId) {
         populateSelectWithOptions(dom.login.studentSelect, students, 'Aluno', 'id', 'name', (student) => {
             // Lógica para desabilitar alunos que já concluíram
             const isCompleted = completedStudentIds.has(student.id);
-            console.log(`🎯 Estudante ${student.name}: ${isCompleted ? 'BLOQUEADO' : 'DISPONÍVEL'}`);
+            const hasAdaptation = hasValidAdaptationDetails(student.adaptation_details);
+
+            console.log(`🎯 Estudante ${student.name}: ${isCompleted ? 'BLOQUEADO' : 'DISPONÍVEL'}${hasAdaptation ? ' (Adaptação)' : ''}`);
 
             if (isCompleted) {
                 return { disabled: true, textSuffix: ' (Concluído)' };
             }
-            if (hasValidAdaptationDetails(student.adaptation_details)) {
-                return { 'data-has-adaptation': 'true', textSuffix: ' *' };
+            if (hasAdaptation) {
+                const adaptationInfo = getAdaptationSummary(student.adaptation_details);
+                return {
+                    'data-has-adaptation': 'true',
+                    'data-adaptation-info': adaptationInfo,
+                    textSuffix: ' 🎯'
+                };
             }
             return {};
         });
@@ -219,8 +226,19 @@ function handleSelectionChange() {
 function updateAdaptationUI(studentName) {
     const legend = dom.login.adaptationLegend;
     if (studentName) {
-        const cleanName = studentName.replace(' *', '');
-        legend.innerHTML = `* <strong>${cleanName}</strong> receberá uma avaliação adaptada.`;
+        const studentSelect = dom.login.studentSelect;
+        const selectedOption = studentSelect.options[studentSelect.selectedIndex];
+        const adaptationInfo = selectedOption?.getAttribute('data-adaptation-info') || '';
+
+        const cleanName = studentName.replace(' 🎯', '');
+
+        legend.innerHTML = `
+            <span class="icon">🎯</span>
+            <div>
+                <strong>Avaliação Adaptada para ${cleanName}:</strong><br>
+                <span class="text-sm">${adaptationInfo || 'Interface personalizada de acordo com necessidades específicas.'}</span>
+            </div>
+        `;
         legend.classList.remove('hidden');
     } else {
         legend.classList.add('hidden');
@@ -239,6 +257,45 @@ function hasValidAdaptationDetails(details) {
     if (!details) return false;
     // Uma simples verificação para ver se o objeto não está vazio
     return typeof details === 'object' && Object.keys(details).length > 0;
+}
+
+/**
+ * Gera um resumo das adaptações necessárias para um estudante
+ * @param {Object} adaptationDetails - Detalhes de adaptação do estudante
+ * @returns {string} Resumo das adaptações
+ */
+function getAdaptationSummary(adaptationDetails) {
+    if (!adaptationDetails) return '';
+
+    try {
+        const details = typeof adaptationDetails === 'string'
+            ? JSON.parse(adaptationDetails)
+            : adaptationDetails;
+
+        const parts = [];
+
+        // Diagnóstico principal
+        if (details.diagnosis) {
+            parts.push(details.diagnosis);
+        }
+
+        // Características principais das necessidades
+        if (details.needs && Array.isArray(details.needs)) {
+            const needs = details.needs.slice(0, 2); // Primeiras 2 necessidades
+            parts.push(...needs);
+        }
+
+        // Sugestões de adaptação
+        if (details.suggestions && Array.isArray(details.suggestions)) {
+            const suggestions = details.suggestions.slice(0, 1); // Primeira sugestão
+            parts.push(...suggestions);
+        }
+
+        return parts.join(' • ').substring(0, 120) + (parts.join(' • ').length > 120 ? '...' : '');
+    } catch (error) {
+        console.warn('Erro ao processar detalhes de adaptação:', error);
+        return 'Interface adaptada disponível';
+    }
 }
 
 

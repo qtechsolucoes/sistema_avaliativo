@@ -70,6 +70,12 @@ class OnlineDataService {
     }
 
     async getStudentsByClass(classId) {
+        // Verifica se o modo mock foi forçado para testes
+        if (localStorage.getItem('forceMockData') === 'true') {
+            logService.info('🧪 MODO MOCK FORÇADO - Usando dados de teste com adaptações');
+            return mockDataService.getStudentsByClass(classId);
+        }
+
         if (!(await this.ensureConnection())) {
             logService.warn('Conexão Supabase falhou, usando dados mock para estudantes');
             return mockDataService.getStudentsByClass(classId);
@@ -166,6 +172,7 @@ class OnlineDataService {
                 const student = {
                     id: studentData.id,
                     name: studentData.full_name || `Estudante ${studentData.id}`,
+                    adaptation_details: studentData.adaptation_details,
                     special_needs: studentData.adaptation_details ? true : false
                 };
 
@@ -187,6 +194,7 @@ class OnlineDataService {
                         name: student.name,
                         nameType: typeof student.name,
                         nameValue: JSON.stringify(student.name),
+                        adaptation_details: student.adaptation_details,
                         special_needs: student.special_needs
                     });
                 }
@@ -362,30 +370,12 @@ class OnlineDataService {
                 logService.warn('Erro na chamada RPC:', rpcError);
             }
 
-            // Estratégia 2: Inserção direta na tabela
-            const submissionRecord = {
-                student_id: submissionData.studentId,
-                assessment_id: submissionData.assessmentId,
-                score: submissionData.score,
-                total_questions: submissionData.totalQuestions,
-                total_duration_seconds: submissionData.totalDuration,
-                answer_log: submissionData.answerLog,
-                submitted_at: new Date().toISOString()
-            };
+            // Estratégia 2: Não usar inserção direta - schema requer uso da função RPC
+            // A tabela submissions não tem coluna answers, as respostas vão para submission_answers
+            // Apenas a função submit_assessment pode fazer isso corretamente
 
-            logService.debug('Tentando inserção direta na tabela submissions:', submissionRecord);
-
-            const directResult = await this.client
-                .from('submissions')
-                .insert(submissionRecord);
-
-            if (!directResult.error) {
-                logService.info('Submissão salva com sucesso via inserção direta');
-                return { success: true, synced: true, method: 'direct' };
-            }
-
-            error = directResult.error;
-            logService.warn('Inserção direta falhou:', error);
+            logService.info('Inserção direta não disponível - schema requer uso de RPC submit_assessment');
+            error = rpcResult.error;
 
             // Análise do erro
             if (error.code === 'P0001') {
@@ -398,24 +388,18 @@ class OnlineDataService {
 
             if (error.code === '42501' || error.status === 401 ||
                 error.message?.includes('RLS') || error.message?.includes('permission')) {
-                // Erro de RLS/Autenticação - CRÍTICO
-                logService.error('ERRO CRÍTICO: RLS/Auth impedindo salvamento no Supabase', {
+                // Erro de RLS/Autenticação - Problema de configuração do Supabase
+                logService.error('ERRO RLS/Auth: Função submit_assessment sem permissão', {
                     studentId: submissionData.studentId,
                     error: error.message,
                     code: error.code,
                     status: error.status
                 });
 
-                // Estratégia 3: Tenta autenticação anônima e retry
-                const authResult = await this.tryAnonymousAuthAndRetry(submissionData);
-                if (authResult.success) {
-                    return authResult;
-                }
-
-                // Estratégia 4: Avisa sobre RLS e sugere solução
-                console.error('🚨 SISTEMA COMPROMETIDO: RLS impedindo submissões centralizadas');
-                console.error('💡 SOLUÇÃO: Desabilite RLS na tabela "submissions" ou configure autenticação anônima');
-                console.error('📋 Comando SQL sugerido: ALTER TABLE submissions DISABLE ROW LEVEL SECURITY;');
+                console.error('🚨 CONFIGURAÇÃO NECESSÁRIA NO SUPABASE:');
+                console.error('1️⃣ Habilitar autenticação anônima em Authentication > Settings');
+                console.error('2️⃣ OU configurar RLS adequado para função submit_assessment');
+                console.error('3️⃣ OU desabilitar RLS temporariamente: ALTER TABLE submissions DISABLE ROW LEVEL SECURITY;');
 
                 return this.saveOfflineWithWarning(submissionData);
             }
@@ -425,6 +409,50 @@ class OnlineDataService {
         } catch (error) {
             logService.error('Erro ao salvar submissão no Supabase', error);
             return this.saveOffline(submissionData);
+        }
+    }
+
+    async tryAnonymousAuthAndRetry(submissionData) {
+        try {
+            logService.info('Tentando autenticação anônima para resolver RLS...');
+
+            // Tenta reinicializar autenticação anônima
+            const { initializeAnonymousSession } = await import('./supabaseClient.js');
+            const authSuccess = await initializeAnonymousSession(this.client);
+
+            if (!authSuccess) {
+                logService.warn('Autenticação anônima falhou - não é possível resolver RLS');
+                return { success: false };
+            }
+
+            // Retry da submissão após autenticação
+            logService.info('Tentando submissão novamente após autenticação anônima...');
+
+            const submissionRecord = {
+                student_id: submissionData.studentId,
+                assessment_id: submissionData.assessmentId,
+                score: submissionData.score,
+                total_questions: submissionData.totalQuestions,
+                total_duration_seconds: submissionData.totalDuration,
+                answers: submissionData.answerLog,
+                submitted_at: new Date().toISOString()
+            };
+
+            const retryResult = await this.client
+                .from('submissions')
+                .insert(submissionRecord);
+
+            if (!retryResult.error) {
+                logService.info('✅ Submissão bem-sucedida após autenticação anônima!');
+                return { success: true, synced: true, method: 'auth_retry' };
+            } else {
+                logService.error('Retry após autenticação também falhou:', retryResult.error);
+                return { success: false };
+            }
+
+        } catch (error) {
+            logService.error('Erro durante tentativa de autenticação e retry:', error);
+            return { success: false };
         }
     }
 
@@ -714,11 +742,11 @@ class OnlineDataService {
             logService.info('Carregando respostas da submissão:', submissionId);
 
             // Busca respostas com dados das questões
+            // Nota: schema tem apenas question_id, is_correct, duration_seconds (sem selected_option)
             const { data: answers, error } = await this.client
                 .from('submission_answers')
                 .select(`
                     question_id,
-                    selected_option,
                     is_correct,
                     duration_seconds,
                     questions!inner(

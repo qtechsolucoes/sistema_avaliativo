@@ -9,13 +9,15 @@ export const mockDataService = {
     
     getStudentsByClass(classId) {
         const mockStudents = [
-            { 
-                id: `student-1-${classId}`, 
+            {
+                id: `student-1-${classId}`,
+                name: 'Ana Silva',
                 full_name: 'Ana Silva',
                 adaptation_details: null
             },
-            { 
-                id: `student-2-${classId}`, 
+            {
+                id: `student-2-${classId}`,
+                name: 'João Santos',
                 full_name: 'João Santos',
                 adaptation_details: {
                     diagnosis: ["TDAH"],
@@ -25,6 +27,7 @@ export const mockDataService = {
             },
             {
                 id: `student-3-${classId}`,
+                name: 'Maria Costa',
                 full_name: 'Maria Costa',
                 adaptation_details: {
                     diagnosis: ["TEA"],
@@ -33,6 +36,7 @@ export const mockDataService = {
                 }
             }
         ];
+        console.log('🧪 MOCK DATA: Retornando estudantes de teste:', mockStudents);
         return mockStudents;
     },
     

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Teste Forçado - Dados Mock</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 8px;
+        }
+        .result {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border-left: 4px solid;
+        }
+        .success { background-color: #d4edda; color: #155724; border-left-color: #28a745; }
+        .error { background-color: #f8d7da; color: #721c24; border-left-color: #dc3545; }
+        .warning { background-color: #fff3cd; color: #856404; border-left-color: #ffc107; }
+        .info { background-color: #d1ecf1; color: #0c5460; border-left-color: #17a2b8; }
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102,126,234,0.3);
+        }
+        .btn-test { background: linear-gradient(45deg, #28a745, #20c997); }
+        .btn-danger { background: linear-gradient(45deg, #dc3545, #e83e8c); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Teste Forçado - Sistema de Adaptações</h1>
+            <p>Força o uso de dados mock para testar adaptações</p>
+        </div>
+
+        <div>
+            <button onclick="enableMockMode()" class="btn-test">🔄 Ativar Modo Mock</button>
+            <button onclick="disableMockMode()" class="btn-danger">❌ Desativar Modo Mock</button>
+            <button onclick="testMockStudents()">👥 Testar Estudantes Mock</button>
+            <button onclick="clearResults()">🧹 Limpar</button>
+        </div>
+
+        <div id="results"></div>
+
+        <div style="margin-top: 30px; padding: 20px; background: #e8f5e8; border-radius: 8px;">
+            <h3>📋 Instruções para Teste</h3>
+            <ol>
+                <li>Clique em "Ativar Modo Mock" para forçar o uso de dados mock</li>
+                <li>Recarregue a página principal (index.html)</li>
+                <li>Selecione ano "6", depois qualquer turma</li>
+                <li>Você verá estudantes com ícone 🎯 (João Santos, Maria Costa)</li>
+                <li>Selecione um estudante com adaptação para ver a interface personalizada</li>
+                <li>Clique em "Desativar Modo Mock" quando terminar o teste</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function enableMockMode() {
+            localStorage.setItem('forceMockData', 'true');
+            addResult('✅ Modo Mock ATIVADO', 'success');
+            addResult('🔄 Recarregue a página principal para usar dados mock', 'info');
+            addResult('📝 Os estudantes "João Santos" e "Maria Costa" terão adaptações', 'info');
+        }
+
+        function disableMockMode() {
+            localStorage.removeItem('forceMockData');
+            addResult('❌ Modo Mock DESATIVADO', 'warning');
+            addResult('🔄 Recarregue a página principal para usar dados reais', 'info');
+        }
+
+        function testMockStudents() {
+            addResult('👥 <strong>Estudantes Mock com Adaptações:</strong>', 'info');
+
+            const mockStudents = [
+                {
+                    name: 'Ana Silva',
+                    adaptation: null,
+                    expected: 'Sem adaptação - interface padrão'
+                },
+                {
+                    name: 'João Santos',
+                    adaptation: {
+                        diagnosis: ["TDAH"],
+                        suggestions: ["Textos curtos", "Poucas alternativas"],
+                        difficulties: ["Concentração"]
+                    },
+                    expected: 'Quiz simplificado com 2 alternativas'
+                },
+                {
+                    name: 'Maria Costa',
+                    adaptation: {
+                        diagnosis: ["TEA"],
+                        suggestions: ["Atividades visuais", "Rotina estruturada"],
+                        difficulties: ["Comunicação", "Interação social"]
+                    },
+                    expected: 'Quiz simplificado com interface reduzida'
+                }
+            ];
+
+            mockStudents.forEach(student => {
+                addResult(`👤 ${student.name}:`, 'info');
+                if (student.adaptation) {
+                    addResult(`&nbsp;&nbsp;🎯 Diagnóstico: ${student.adaptation.diagnosis.join(', ')}`, 'warning');
+                    addResult(`&nbsp;&nbsp;✨ Interface: ${student.expected}`, 'success');
+                } else {
+                    addResult(`&nbsp;&nbsp;➖ ${student.expected}`, 'info');
+                }
+            });
+
+            addResult('🔍 Estado atual do localStorage:', 'info');
+            const mockMode = localStorage.getItem('forceMockData');
+            addResult(`&nbsp;&nbsp;forceMockData: ${mockMode || 'não definido'}`, mockMode ? 'success' : 'warning');
+        }
+
+        // Auto-executar verificação inicial
+        setTimeout(() => {
+            addResult('🧪 <strong>Ferramenta de Teste - Pronta</strong>', 'success');
+            const mockMode = localStorage.getItem('forceMockData');
+            if (mockMode) {
+                addResult('⚠️ Modo Mock está ATIVO', 'warning');
+            } else {
+                addResult('ℹ️ Usando dados reais do Supabase', 'info');
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

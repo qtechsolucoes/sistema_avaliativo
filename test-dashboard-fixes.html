@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Correções do Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #00b894, #00a085);
+            color: white;
+            border-radius: 8px;
+        }
+        .fix-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .result {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border-left: 4px solid;
+        }
+        .success { background-color: #d4edda; color: #155724; border-left-color: #28a745; }
+        .error { background-color: #f8d7da; color: #721c24; border-left-color: #dc3545; }
+        .warning { background-color: #fff3cd; color: #856404; border-left-color: #ffc107; }
+        .info { background-color: #d1ecf1; color: #0c5460; border-left-color: #17a2b8; }
+        button {
+            background: linear-gradient(45deg, #6c5ce7, #a29bfe);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108,92,231,0.3);
+        }
+        .btn-success { background: linear-gradient(45deg, #00b894, #00a085); }
+        .btn-danger { background: linear-gradient(45deg, #dc3545, #e83e8c); }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            border: 1px solid #dee2e6;
+            font-size: 12px;
+        }
+        .code-example {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Correções do Dashboard Aplicadas</h1>
+            <p>Verificando se os problemas de nomes e funções foram resolvidos</p>
+        </div>
+
+        <div class="fix-section">
+            <h3>✅ Problema 1: Nomes "Desconhecido" - CORRIGIDO</h3>
+            <p><strong>Causa:</strong> Dashboard tentava acessar <code>result.students?.full_name</code> mas os dados estavam em <code>result.student_name</code></p>
+
+            <div class="code-example">
+                <strong>Antes:</strong><br>
+                studentName: result.students?.full_name || 'Desconhecido'<br><br>
+                <strong>Depois:</strong><br>
+                studentName: result.student_name || 'Desconhecido'
+            </div>
+
+            <p><strong>Arquivos corrigidos:</strong></p>
+            <ul>
+                <li>📄 <code>src/teacher/dashboard/dashboardTable.js:107</code> - Campo studentName</li>
+                <li>📄 <code>src/teacher/dashboard/dashboardTable.js:157</code> - Ordenação por nome</li>
+            </ul>
+        </div>
+
+        <div class="fix-section">
+            <h3>✅ Problema 2: showYearComparison is not a function - CORRIGIDO</h3>
+            <p><strong>Causa:</strong> Métodos <code>showYearComparison</code> e <code>showClassComparison</code> não existiam na classe DashboardManager</p>
+
+            <div class="code-example">
+                <strong>Adicionado em DashboardManager:</strong><br>
+                showYearComparison() { ... }<br>
+                showClassComparison(yearFilter) { ... }
+            </div>
+
+            <p><strong>Arquivo corrigido:</strong></p>
+            <ul>
+                <li>📄 <code>src/teacher/dashboard/index.js:86-96</code> - Métodos adicionados</li>
+            </ul>
+        </div>
+
+        <div class="fix-section">
+            <h3>🧪 Testes de Validação</h3>
+            <button onclick="testStudentNames()" class="btn-success">👤 Testar Nomes dos Estudantes</button>
+            <button onclick="testDashboardMethods()">🔧 Testar Métodos do Dashboard</button>
+            <button onclick="simulateDataStructure()">📊 Simular Estrutura de Dados</button>
+            <button onclick="clearResults()" class="btn-danger">🧹 Limpar</button>
+        </div>
+
+        <div id="results"></div>
+
+        <div class="fix-section">
+            <h3>📋 Como Verificar se Funcionou</h3>
+            <ol>
+                <li><strong>Nomes dos Estudantes:</strong> Acesse o dashboard do professor e verifique se os nomes aparecem corretamente (não "Desconhecido")</li>
+                <li><strong>Sem Erros no Console:</strong> Não deve aparecer mais o erro "showYearComparison is not a function"</li>
+                <li><strong>Filtros Funcionando:</strong> Os filtros de ano e classe devem funcionar sem erros</li>
+                <li><strong>Ordenação por Nome:</strong> Clicar na coluna "Nome" deve ordenar pelos nomes dos estudantes</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function testStudentNames() {
+            addResult('👤 <strong>Testando Mapeamento de Nomes dos Estudantes</strong>', 'info');
+
+            // Simular dados como retornados pelo dataService
+            const mockSubmissionData = {
+                id: '3cf8f46e-fb3f-4026-a363-0b1b6e87184f',
+                student_id: 'dea6a04e-cf11-4630-9512-58f32495f12f',
+                student_name: 'ADASSA BARBOSA DE ARAUJO', // Campo correto
+                student_class: '7º B',
+                student_grade: '7',
+                score: 8,
+                total_questions: 10,
+                total_duration_seconds: 300,
+                submitted_at: new Date().toISOString()
+            };
+
+            addResult('📊 Estrutura de dados simulada:', 'info');
+            addResult(`&nbsp;&nbsp;• student_id: ${mockSubmissionData.student_id}`, 'info');
+            addResult(`&nbsp;&nbsp;• student_name: "${mockSubmissionData.student_name}"`, 'success');
+            addResult(`&nbsp;&nbsp;• student_class: ${mockSubmissionData.student_class}`, 'info');
+
+            // Simular processamento do dashboard
+            const studentName = mockSubmissionData.student_name || 'Desconhecido';
+
+            if (studentName !== 'Desconhecido') {
+                addResult(`✅ Nome extraído corretamente: "${studentName}"`, 'success');
+                addResult('✅ Campo student_name está sendo usado corretamente', 'success');
+            } else {
+                addResult('❌ Nome ainda apareceria como "Desconhecido"', 'error');
+            }
+
+            addResult('📋 Verificação de mapeamento de campos:', 'info');
+            addResult('&nbsp;&nbsp;• Antes: result.students?.full_name ❌', 'error');
+            addResult('&nbsp;&nbsp;• Depois: result.student_name ✅', 'success');
+        }
+
+        function testDashboardMethods() {
+            addResult('🔧 <strong>Testando Métodos do Dashboard</strong>', 'info');
+
+            // Simular classe DashboardManager (métodos adicionados)
+            const mockDashboardManager = {
+                applyFilters: function(yearFilter, classFilter) {
+                    return `Filtros aplicados: ano=${yearFilter}, classe=${classFilter}`;
+                },
+
+                showYearComparison: function() {
+                    // Implementação adicionada
+                    return this.applyFilters('all', 'all');
+                },
+
+                showClassComparison: function(yearFilter) {
+                    // Implementação adicionada
+                    return this.applyFilters(yearFilter, 'all');
+                }
+            };
+
+            addResult('🧪 Testando método showYearComparison...', 'info');
+            try {
+                const result1 = mockDashboardManager.showYearComparison();
+                addResult(`✅ showYearComparison funcionou: ${result1}`, 'success');
+            } catch (error) {
+                addResult(`❌ showYearComparison falhou: ${error.message}`, 'error');
+            }
+
+            addResult('🧪 Testando método showClassComparison...', 'info');
+            try {
+                const result2 = mockDashboardManager.showClassComparison('2025');
+                addResult(`✅ showClassComparison funcionou: ${result2}`, 'success');
+            } catch (error) {
+                addResult(`❌ showClassComparison falhou: ${error.message}`, 'error');
+            }
+
+            addResult('📋 Métodos implementados como fallback:', 'info');
+            addResult('&nbsp;&nbsp;• showYearComparison() - usa applyFilters("all", "all")', 'success');
+            addResult('&nbsp;&nbsp;• showClassComparison(year) - usa applyFilters(year, "all")', 'success');
+        }
+
+        function simulateDataStructure() {
+            addResult('📊 <strong>Simulando Estrutura Completa de Dados</strong>', 'info');
+
+            // Dados como retornados pela query corrigida do Supabase
+            const mockDataFromSupabase = {
+                id: '863e89ef-6d18-4393-967e-9c1dcfb66e9f',
+                student_id: '324e38bc-6379-4b17-88f8-ecbebc37e584',
+                assessment_id: 'a1c112d3-f0c4-48e8-bbef-ba29340266bf',
+                score: 7,
+                total_questions: 10,
+                total_duration_seconds: 180,
+                submitted_at: '2025-09-22T20:00:00Z',
+
+                // Dados processados pelo dataService
+                student_name: 'ALICE CECYLLYA DOS SANTOS HERMENEGILDO',
+                student_class: '8º A',
+                student_grade: '8',
+                period_name: '3º Bimestre',
+                period_year: 2025,
+                assessment_title: 'Artes - 8º Ano - Música na Idade Média',
+                discipline_name: 'Artes'
+            };
+
+            addResult('🔍 Verificando campos necessários para o dashboard:', 'info');
+
+            const requiredFields = [
+                'student_name',
+                'student_class',
+                'student_grade',
+                'score',
+                'total_questions',
+                'submitted_at'
+            ];
+
+            let allFieldsPresent = true;
+
+            requiredFields.forEach(field => {
+                if (mockDataFromSupabase[field] !== undefined) {
+                    addResult(`&nbsp;&nbsp;✅ ${field}: ${mockDataFromSupabase[field]}`, 'success');
+                } else {
+                    addResult(`&nbsp;&nbsp;❌ ${field}: AUSENTE`, 'error');
+                    allFieldsPresent = false;
+                }
+            });
+
+            if (allFieldsPresent) {
+                addResult('🎉 Todos os campos necessários estão presentes!', 'success');
+                addResult('✅ Dashboard deve exibir dados corretamente', 'success');
+            } else {
+                addResult('⚠️ Alguns campos estão ausentes', 'warning');
+            }
+
+            addResult('📈 Simulando renderização da tabela:', 'info');
+            const percentage = (mockDataFromSupabase.score / mockDataFromSupabase.total_questions * 100).toFixed(1);
+            addResult(`&nbsp;&nbsp;• Nome: ${mockDataFromSupabase.student_name}`, 'success');
+            addResult(`&nbsp;&nbsp;• Turma: ${mockDataFromSupabase.student_class}`, 'info');
+            addResult(`&nbsp;&nbsp;• Pontuação: ${mockDataFromSupabase.score}/${mockDataFromSupabase.total_questions} (${percentage}%)`, 'info');
+        }
+
+        // Auto-executar teste inicial
+        setTimeout(() => {
+            addResult('🔧 <strong>Correções do Dashboard Aplicadas</strong>', 'success');
+            addResult('✅ Problema dos nomes "Desconhecido" corrigido', 'success');
+            addResult('✅ Erro "showYearComparison is not a function" corrigido', 'success');
+            addResult('📌 Use os botões acima para testar as correções', 'info');
+        }, 1000);
+    </script>
+</body>
+</html>

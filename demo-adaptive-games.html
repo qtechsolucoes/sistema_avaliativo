@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎮 Jogos Adaptativos - Demonstração</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 8px;
+        }
+        .game-section {
+            margin: 30px 0;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #e0e0e0;
+            position: relative;
+        }
+        .tea-section {
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            border-color: #3b82f6;
+        }
+        .tdah-section {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border-color: #f59e0b;
+        }
+        .down-section {
+            background: linear-gradient(135deg, #fce7f3, #f3e8ff);
+            border-color: #a855f7;
+        }
+        .game-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .game-content {
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+        }
+        .game-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .memory-game {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            max-width: 600px;
+            margin: 20px auto;
+        }
+        .memory-card {
+            aspect-ratio: 1;
+            background: #4f46e5;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+        }
+        .memory-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
+        }
+        .memory-card.flipped {
+            background: white;
+            color: #333;
+            border: 2px solid #4f46e5;
+        }
+        .memory-card.matched {
+            background: #10b981;
+            transform: scale(0.95);
+        }
+        .timeline-game {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 12px;
+            position: relative;
+        }
+        .timeline-game::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            right: 10%;
+            height: 4px;
+            background: #64748b;
+            border-radius: 2px;
+        }
+        .timeline-event {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            border: 3px solid #3b82f6;
+            cursor: grab;
+            min-width: 150px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            transition: all 0.3s ease;
+        }
+        .timeline-event:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        }
+        .timeline-event.dragging {
+            opacity: 0.7;
+            transform: rotate(5deg);
+        }
+        .matching-game {
+            display: grid;
+            grid-template-columns: 1fr 100px 1fr;
+            gap: 20px;
+            align-items: center;
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        .rhythm-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            border: 3px solid #f59e0b;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .rhythm-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
+        }
+        .characteristic-card {
+            background: #fef3c7;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #f59e0b;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .characteristic-card:hover {
+            background: #fde68a;
+        }
+        .connection-line {
+            background: #10b981;
+            height: 4px;
+            border-radius: 2px;
+            position: relative;
+        }
+        .connection-line::before,
+        .connection-line::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 12px;
+            height: 12px;
+            background: #10b981;
+            border-radius: 50%;
+            transform: translateY(-50%);
+        }
+        .connection-line::before { left: -6px; }
+        .connection-line::after { right: -6px; }
+        .drag-drop-game {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 20px 0;
+        }
+        .drop-zone {
+            min-height: 300px;
+            border: 3px dashed #a855f7;
+            border-radius: 12px;
+            background: #fce7f3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+        }
+        .drop-zone.dragover {
+            border-color: #7c3aed;
+            background: #f3e8ff;
+            transform: scale(1.02);
+        }
+        .cultural-item {
+            background: white;
+            padding: 15px;
+            margin: 10px;
+            border-radius: 12px;
+            border: 2px solid #a855f7;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+        .cultural-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(168, 85, 247, 0.3);
+        }
+        .cultural-item.dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+        }
+        .item-icon {
+            font-size: 2rem;
+        }
+        .btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        .btn-start { background: linear-gradient(45deg, #10b981, #059669); }
+        .btn-reset { background: linear-gradient(45deg, #ef4444, #dc2626); }
+        .feedback {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .feedback.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #10b981;
+        }
+        .feedback.encouragement {
+            background: #fef3c7;
+            color: #92400e;
+            border: 2px solid #f59e0b;
+        }
+        .feedback.celebration {
+            background: #fce7f3;
+            color: #7c2d12;
+            border: 2px solid #a855f7;
+            animation: celebration 1s ease-out;
+        }
+        @keyframes celebration {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #10b981, #059669);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 Jogos Adaptativos para Educação Inclusiva</h1>
+            <p>Demonstração dos novos formatos de atividades para estudantes atípicos</p>
+        </div>
+
+        <!-- JOGO PARA TEA: Sequência Temporal -->
+        <div class="game-section tea-section">
+            <div class="game-title">
+                🧩 <span>Linha do Tempo Medieval (TEA)</span>
+                <button class="btn btn-start" onclick="startTimelineGame()">▶️ Iniciar</button>
+                <button class="btn btn-reset" onclick="resetTimelineGame()">🔄 Reiniciar</button>
+            </div>
+            <div class="game-content" id="timeline-game">
+                <p><strong>Instruções:</strong> Arraste os eventos para colocá-los na ordem cronológica correta.</p>
+                <div class="timeline-game" id="timeline-container">
+                    <div class="timeline-event" draggable="true" data-order="3">
+                        🎵 Polifonia<br>
+                        <small>Final da Idade Média</small>
+                    </div>
+                    <div class="timeline-event" draggable="true" data-order="1">
+                        ⛪ Canto Gregoriano<br>
+                        <small>Início da Idade Média</small>
+                    </div>
+                    <div class="timeline-event" draggable="true" data-order="2">
+                        🏰 Trovadores<br>
+                        <small>Meio da Idade Média</small>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="timeline-progress" style="width: 0%">0% Completo</div>
+                </div>
+                <div class="feedback" id="timeline-feedback" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- JOGO PARA TDAH: Correspondência Rápida -->
+        <div class="game-section tdah-section">
+            <div class="game-title">
+                ⚡ <span>Ritmos PE - Correspondência Turbo (TDAH)</span>
+                <button class="btn btn-start" onclick="startMatchingGame()">🚀 Iniciar</button>
+                <button class="btn btn-reset" onclick="resetMatchingGame()">🔄 Reiniciar</button>
+            </div>
+            <div class="game-content" id="matching-game">
+                <p><strong>Missão:</strong> Conecte cada ritmo com suas características o mais rápido possível!</p>
+                <div class="matching-game" id="matching-container">
+                    <div class="rhythm-side">
+                        <div class="rhythm-card" data-rhythm="frevo">
+                            <div style="font-size: 2rem;">💃</div>
+                            <h3>FREVO</h3>
+                        </div>
+                        <div class="rhythm-card" data-rhythm="maracatu">
+                            <div style="font-size: 2rem;">👑</div>
+                            <h3>MARACATU</h3>
+                        </div>
+                        <div class="rhythm-card" data-rhythm="ciranda">
+                            <div style="font-size: 2rem;">🌊</div>
+                            <h3>CIRANDA</h3>
+                        </div>
+                    </div>
+                    <div class="connection-area">
+                        <div class="connection-line" style="display: none;"></div>
+                        <div class="connection-line" style="display: none;"></div>
+                        <div class="connection-line" style="display: none;"></div>
+                    </div>
+                    <div class="characteristics-side">
+                        <div class="characteristic-card" data-belongs="frevo">🎺 Rápido e Instrumental</div>
+                        <div class="characteristic-card" data-belongs="maracatu">🥁 Cortejo com Tambores</div>
+                        <div class="characteristic-card" data-belongs="ciranda">🤝 Dança em Roda</div>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="matching-progress" style="width: 0%">0% Completo</div>
+                </div>
+                <div class="feedback" id="matching-feedback" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- JOGO PARA SÍNDROME DE DOWN: Classificação Drag-and-Drop -->
+        <div class="game-section down-section">
+            <div class="game-title">
+                🌈 <span>Classificador Cultural (Síndrome de Down)</span>
+                <button class="btn btn-start" onclick="startDragDropGame()">🎯 Iniciar</button>
+                <button class="btn btn-reset" onclick="resetDragDropGame()">🔄 Reiniciar</button>
+            </div>
+            <div class="game-content" id="dragdrop-game">
+                <p><strong>Objetivo:</strong> Arraste cada item para a caixa correta! 😊</p>
+                <div class="drag-drop-game">
+                    <div class="items-area">
+                        <h3>📦 Itens para Classificar:</h3>
+                        <div class="cultural-item" draggable="true" data-category="material">
+                            <span class="item-icon">🎸</span>
+                            <span>Violão</span>
+                        </div>
+                        <div class="cultural-item" draggable="true" data-category="imaterial">
+                            <span class="item-icon">🎵</span>
+                            <span>Música</span>
+                        </div>
+                        <div class="cultural-item" draggable="true" data-category="material">
+                            <span class="item-icon">☂️</span>
+                            <span>Sombrinha do Frevo</span>
+                        </div>
+                        <div class="cultural-item" draggable="true" data-category="imaterial">
+                            <span class="item-icon">💃</span>
+                            <span>Dança do Frevo</span>
+                        </div>
+                        <div class="cultural-item" draggable="true" data-category="material">
+                            <span class="item-icon">🍰</span>
+                            <span>Bolo</span>
+                        </div>
+                        <div class="cultural-item" draggable="true" data-category="imaterial">
+                            <span class="item-icon">📝</span>
+                            <span>Receita</span>
+                        </div>
+                    </div>
+                    <div class="categories-area">
+                        <div class="drop-zone" data-category="material">
+                            <div style="font-size: 3rem;">📦</div>
+                            <h3>CULTURA MATERIAL</h3>
+                            <p>Coisas que você pode tocar!</p>
+                        </div>
+                        <div class="drop-zone" data-category="imaterial">
+                            <div style="font-size: 3rem;">💭</div>
+                            <h3>CULTURA IMATERIAL</h3>
+                            <p>Ideias e tradições!</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="dragdrop-progress" style="width: 0%">0% Completo</div>
+                </div>
+                <div class="feedback" id="dragdrop-feedback" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- JOGO DE MEMÓRIA PARA DEFICIÊNCIA INTELECTUAL -->
+        <div class="game-section" style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border-color: #10b981;">
+            <div class="game-title">
+                🧠 <span>Jogo da Memória Cultural (Deficiência Intelectual)</span>
+                <button class="btn btn-start" onclick="startMemoryGame()">🎯 Iniciar</button>
+                <button class="btn btn-reset" onclick="resetMemoryGame()">🔄 Reiniciar</button>
+            </div>
+            <div class="game-content" id="memory-game">
+                <p><strong>Objetivo:</strong> Encontre os pares entre cultura material e imaterial!</p>
+                <div class="memory-game" id="memory-container">
+                    <!-- Cards serão criados dinamicamente -->
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="memory-progress" style="width: 0%">0% Completo</div>
+                </div>
+                <div class="feedback" id="memory-feedback" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================================================
+        // JOGO DE LINHA DO TEMPO (TEA)
+        // =====================================================================================
+
+        let timelineOrder = [];
+        let timelineComplete = false;
+
+        function startTimelineGame() {
+            document.getElementById('timeline-game').classList.add('active');
+            setupTimelineDragDrop();
+        }
+
+        function resetTimelineGame() {
+            timelineOrder = [];
+            timelineComplete = false;
+            updateTimelineProgress();
+            document.getElementById('timeline-feedback').style.display = 'none';
+
+            // Reposiciona os eventos
+            const events = document.querySelectorAll('.timeline-event');
+            events.forEach(event => {
+                event.style.opacity = '1';
+                event.style.transform = 'none';
+            });
+        }
+
+        function setupTimelineDragDrop() {
+            const events = document.querySelectorAll('.timeline-event');
+
+            events.forEach(event => {
+                event.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', e.target.dataset.order);
+                    e.target.classList.add('dragging');
+                });
+
+                event.addEventListener('dragend', (e) => {
+                    e.target.classList.remove('dragging');
+                });
+
+                event.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                });
+
+                event.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const draggedOrder = e.dataTransfer.getData('text/plain');
+                    const targetOrder = e.target.dataset.order;
+
+                    if (draggedOrder !== targetOrder) {
+                        // Troca posições
+                        swapTimelineEvents(draggedOrder, targetOrder);
+                    }
+
+                    checkTimelineOrder();
+                });
+            });
+        }
+
+        function swapTimelineEvents(order1, order2) {
+            const event1 = document.querySelector(`[data-order="${order1}"]`);
+            const event2 = document.querySelector(`[data-order="${order2}"]`);
+
+            // Troca os dados
+            const temp = event1.dataset.order;
+            event1.dataset.order = event2.dataset.order;
+            event2.dataset.order = temp;
+        }
+
+        function checkTimelineOrder() {
+            const events = Array.from(document.querySelectorAll('.timeline-event'));
+            const currentOrder = events.map((event, index) => ({
+                position: index,
+                order: parseInt(event.dataset.order)
+            }));
+
+            let correctPositions = 0;
+            currentOrder.forEach((item, index) => {
+                if (item.order === index + 1) {
+                    correctPositions++;
+                }
+            });
+
+            const progress = (correctPositions / 3) * 100;
+            updateTimelineProgress(progress);
+
+            if (correctPositions === 3) {
+                showTimelineFeedback('🎉 Perfeito! Você organizou a linha do tempo corretamente!', 'celebration');
+                timelineComplete = true;
+            }
+        }
+
+        function updateTimelineProgress(progress = 0) {
+            const progressBar = document.getElementById('timeline-progress');
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = Math.round(progress) + '% Completo';
+        }
+
+        function showTimelineFeedback(message, type) {
+            const feedback = document.getElementById('timeline-feedback');
+            feedback.textContent = message;
+            feedback.className = `feedback ${type}`;
+            feedback.style.display = 'block';
+        }
+
+        // =====================================================================================
+        // JOGO DE CORRESPONDÊNCIA RÁPIDA (TDAH)
+        // =====================================================================================
+
+        let matchingConnections = 0;
+        let matchingStartTime = 0;
+
+        function startMatchingGame() {
+            document.getElementById('matching-game').classList.add('active');
+            matchingStartTime = Date.now();
+            setupMatchingGame();
+        }
+
+        function resetMatchingGame() {
+            matchingConnections = 0;
+            updateMatchingProgress();
+            document.getElementById('matching-feedback').style.display = 'none';
+
+            // Reset visual states
+            const cards = document.querySelectorAll('.rhythm-card, .characteristic-card');
+            cards.forEach(card => {
+                card.classList.remove('connected');
+                card.style.opacity = '1';
+            });
+
+            const connections = document.querySelectorAll('.connection-line');
+            connections.forEach(line => line.style.display = 'none');
+        }
+
+        function setupMatchingGame() {
+            const rhythmCards = document.querySelectorAll('.rhythm-card');
+            const characteristicCards = document.querySelectorAll('.characteristic-card');
+
+            let selectedRhythm = null;
+
+            rhythmCards.forEach(card => {
+                card.addEventListener('click', () => {
+                    if (selectedRhythm) {
+                        selectedRhythm.style.boxShadow = 'none';
+                    }
+                    selectedRhythm = card;
+                    card.style.boxShadow = '0 0 20px #f59e0b';
+                });
+            });
+
+            characteristicCards.forEach(card => {
+                card.addEventListener('click', () => {
+                    if (selectedRhythm) {
+                        const rhythmType = selectedRhythm.dataset.rhythm;
+                        const belongsTo = card.dataset.belongs;
+
+                        if (rhythmType === belongsTo) {
+                            // Conexão correta
+                            selectedRhythm.classList.add('connected');
+                            card.classList.add('connected');
+                            selectedRhythm.style.opacity = '0.7';
+                            card.style.opacity = '0.7';
+
+                            matchingConnections++;
+                            updateMatchingProgress();
+
+                            if (matchingConnections === 3) {
+                                const timeElapsed = (Date.now() - matchingStartTime) / 1000;
+                                showMatchingFeedback(`🏆 INCRÍVEL! Você conectou tudo em ${timeElapsed.toFixed(1)} segundos!`, 'celebration');
+                            } else {
+                                showMatchingFeedback('🎯 ACERTOU! Continue assim!', 'success');
+                            }
+                        } else {
+                            showMatchingFeedback('💪 Quase! Tente outra combinação!', 'encouragement');
+                        }
+
+                        selectedRhythm.style.boxShadow = 'none';
+                        selectedRhythm = null;
+                    }
+                });
+            });
+        }
+
+        function updateMatchingProgress() {
+            const progress = (matchingConnections / 3) * 100;
+            const progressBar = document.getElementById('matching-progress');
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = Math.round(progress) + '% Completo';
+        }
+
+        function showMatchingFeedback(message, type) {
+            const feedback = document.getElementById('matching-feedback');
+            feedback.textContent = message;
+            feedback.className = `feedback ${type}`;
+            feedback.style.display = 'block';
+
+            setTimeout(() => {
+                if (type !== 'celebration') {
+                    feedback.style.display = 'none';
+                }
+            }, 2000);
+        }
+
+        // =====================================================================================
+        // JOGO DRAG-AND-DROP (SÍNDROME DE DOWN)
+        // =====================================================================================
+
+        let dragDropCorrect = 0;
+        const totalDragDropItems = 6;
+
+        function startDragDropGame() {
+            document.getElementById('dragdrop-game').classList.add('active');
+            setupDragDropGame();
+        }
+
+        function resetDragDropGame() {
+            dragDropCorrect = 0;
+            updateDragDropProgress();
+            document.getElementById('dragdrop-feedback').style.display = 'none';
+
+            // Move items back to original area
+            const items = document.querySelectorAll('.cultural-item');
+            const itemsArea = document.querySelector('.items-area');
+            items.forEach(item => {
+                itemsArea.appendChild(item);
+                item.style.opacity = '1';
+            });
+        }
+
+        function setupDragDropGame() {
+            const items = document.querySelectorAll('.cultural-item');
+            const dropZones = document.querySelectorAll('.drop-zone');
+
+            items.forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', e.target.dataset.category);
+                    e.target.classList.add('dragging');
+                });
+
+                item.addEventListener('dragend', (e) => {
+                    e.target.classList.remove('dragging');
+                });
+            });
+
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    zone.classList.add('dragover');
+                });
+
+                zone.addEventListener('dragleave', () => {
+                    zone.classList.remove('dragover');
+                });
+
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('dragover');
+
+                    const itemCategory = e.dataTransfer.getData('text/plain');
+                    const zoneCategory = zone.dataset.category;
+                    const draggedItem = document.querySelector('.cultural-item.dragging');
+
+                    if (draggedItem && itemCategory === zoneCategory) {
+                        // Correto
+                        zone.appendChild(draggedItem);
+                        draggedItem.style.opacity = '0.8';
+                        dragDropCorrect++;
+
+                        updateDragDropProgress();
+
+                        if (dragDropCorrect === totalDragDropItems) {
+                            showDragDropFeedback('🎉 PARABÉNS! Você organizou tudo perfeitamente! Você é muito inteligente! 🌟', 'celebration');
+                        } else {
+                            showDragDropFeedback('😊 Muito bem! Continue assim!', 'success');
+                        }
+                    } else {
+                        showDragDropFeedback('💝 Quase acertou! Tente de novo!', 'encouragement');
+                    }
+                });
+            });
+        }
+
+        function updateDragDropProgress() {
+            const progress = (dragDropCorrect / totalDragDropItems) * 100;
+            const progressBar = document.getElementById('dragdrop-progress');
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = Math.round(progress) + '% Completo';
+        }
+
+        function showDragDropFeedback(message, type) {
+            const feedback = document.getElementById('dragdrop-feedback');
+            feedback.textContent = message;
+            feedback.className = `feedback ${type}`;
+            feedback.style.display = 'block';
+
+            setTimeout(() => {
+                if (type !== 'celebration') {
+                    feedback.style.display = 'none';
+                }
+            }, 3000);
+        }
+
+        // =====================================================================================
+        // JOGO DE MEMÓRIA (DEFICIÊNCIA INTELECTUAL)
+        // =====================================================================================
+
+        let memoryCards = [];
+        let flippedCards = [];
+        let matchedPairs = 0;
+
+        function startMemoryGame() {
+            document.getElementById('memory-game').classList.add('active');
+            createMemoryCards();
+        }
+
+        function resetMemoryGame() {
+            matchedPairs = 0;
+            flippedCards = [];
+            updateMemoryProgress();
+            document.getElementById('memory-feedback').style.display = 'none';
+            createMemoryCards();
+        }
+
+        function createMemoryCards() {
+            const container = document.getElementById('memory-container');
+            container.innerHTML = '';
+
+            const pairs = [
+                { material: '🎸', imaterial: '🎵', name1: 'Violão', name2: 'Música' },
+                { material: '🍳', imaterial: '📝', name1: 'Panela', name2: 'Receita' },
+                { material: '👗', imaterial: '💃', name1: 'Roupa', name2: 'Dança' },
+                { material: '📚', imaterial: '📖', name1: 'Livro', name2: 'História' }
+            ];
+
+            memoryCards = [];
+            pairs.forEach((pair, index) => {
+                memoryCards.push({ id: `material-${index}`, icon: pair.material, name: pair.name1, pair: index });
+                memoryCards.push({ id: `imaterial-${index}`, icon: pair.imaterial, name: pair.name2, pair: index });
+            });
+
+            // Embaralha
+            memoryCards.sort(() => Math.random() - 0.5);
+
+            memoryCards.forEach((card, index) => {
+                const cardElement = document.createElement('div');
+                cardElement.className = 'memory-card';
+                cardElement.dataset.cardId = card.id;
+                cardElement.dataset.pair = card.pair;
+                cardElement.textContent = '?';
+                cardElement.addEventListener('click', () => flipMemoryCard(cardElement, card));
+                container.appendChild(cardElement);
+            });
+        }
+
+        function flipMemoryCard(cardElement, card) {
+            if (cardElement.classList.contains('flipped') || flippedCards.length >= 2) {
+                return;
+            }
+
+            cardElement.classList.add('flipped');
+            cardElement.innerHTML = `${card.icon}<br><small>${card.name}</small>`;
+            flippedCards.push({ element: cardElement, card });
+
+            if (flippedCards.length === 2) {
+                setTimeout(checkMemoryMatch, 1000);
+            }
+        }
+
+        function checkMemoryMatch() {
+            const [first, second] = flippedCards;
+
+            if (first.card.pair === second.card.pair) {
+                // Match!
+                first.element.classList.add('matched');
+                second.element.classList.add('matched');
+                matchedPairs++;
+
+                updateMemoryProgress();
+
+                if (matchedPairs === 4) {
+                    showMemoryFeedback('🎉 Parabéns! Você encontrou todos os pares! Sua memória é excelente!', 'celebration');
+                } else {
+                    showMemoryFeedback('✅ Muito bem! Você encontrou um par!', 'success');
+                }
+            } else {
+                // No match
+                setTimeout(() => {
+                    first.element.classList.remove('flipped');
+                    second.element.classList.remove('flipped');
+                    first.element.textContent = '?';
+                    second.element.textContent = '?';
+                }, 500);
+
+                showMemoryFeedback('💪 Continue tentando! Você consegue!', 'encouragement');
+            }
+
+            flippedCards = [];
+        }
+
+        function updateMemoryProgress() {
+            const progress = (matchedPairs / 4) * 100;
+            const progressBar = document.getElementById('memory-progress');
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = Math.round(progress) + '% Completo';
+        }
+
+        function showMemoryFeedback(message, type) {
+            const feedback = document.getElementById('memory-feedback');
+            feedback.textContent = message;
+            feedback.className = `feedback ${type}`;
+            feedback.style.display = 'block';
+
+            setTimeout(() => {
+                if (type !== 'celebration') {
+                    feedback.style.display = 'none';
+                }
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
