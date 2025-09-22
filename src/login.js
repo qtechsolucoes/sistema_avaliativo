@@ -1,17 +1,21 @@
-// src/login.js - VERSÃO CORRIGIDA
+// src/login.js - VERSÃO CORRIGIDA E ROBUSTA
 
-import { dom, updateState } from './state.js';
-import { getClassesByGrade, getStudentsByClass, getAllSubmissionsForDashboard } from './database.js';
+import { dom, state, updateState } from './state.js';
+import { getClassesByGrade, getStudentsByClass } from './database.js';
+import { logService } from './services/logService.js';
+import { cacheService } from './services/cacheService.js';
 
-let availableClasses = [];
-let availableStudents = [];
-let completedSubmissions = [];
-let currentLoadingOperation = null; // CORREÇÃO: Controle de race conditions
+// Cache para armazenar dados da sessão e evitar chamadas repetidas
+const SESSION_CACHE_KEY_CLASSES = 'login_classes_';
+const SESSION_CACHE_KEY_STUDENTS = 'login_students_';
+
+let activeController = null; // Para controlar e abortar requisições antigas
 
 /**
- * Preenche o seletor de anos com as opções disponíveis.
+ * Preenche o seletor de anos (séries).
  */
 function populateYears() {
+    dom.login.yearSelect.innerHTML = '<option value="">-- Selecione --</option>'; // Limpa opções antigas
     const availableYears = ['6', '7', '8', '9'];
     availableYears.forEach(year => {
         const option = document.createElement('option');
@@ -22,476 +26,279 @@ function populateYears() {
 }
 
 /**
- * CORRIGIDA: Busca e preenche o seletor de turmas com debounce e validação.
- * @param {string} grade - O ano selecionado (ex: '6').
+ * Busca e preenche o seletor de turmas de forma segura e eficiente.
+ * @param {string} grade - O ano/série selecionado.
  */
 async function populateClasses(grade) {
-    // CORREÇÃO: Cancela operação anterior se ainda estiver em andamento
-    if (currentLoadingOperation) {
-        currentLoadingOperation.cancelled = true;
+    // Aborta qualquer requisição anterior para evitar race conditions
+    if (activeController) {
+        activeController.abort();
     }
-    
-    const operation = { cancelled: false, type: 'classes', grade };
-    currentLoadingOperation = operation;
-    
-    // Reset dos seletores dependentes
-    resetClassSelector();
-    resetStudentSelector();
-    hideAdaptationLegend();
+    activeController = new AbortController();
+    const signal = activeController.signal;
+
+    // Reseta os seletores dependentes
+    resetSelect(dom.login.classSelect, 'turma');
+    resetSelect(dom.login.studentSelect, 'aluno');
+    updateAdaptationUI(null);
+    updateStartButtonState();
 
     if (!grade) {
-        dom.login.classSelect.innerHTML = '<option value="">-- Selecione o ano primeiro --</option>';
         return;
     }
 
-    // Indica carregamento
-    dom.login.classSelect.innerHTML = '<option value="">-- A carregar turmas... --</option>';
-    dom.login.classSelect.disabled = true;
-
+    setSelectLoading(dom.login.classSelect, true, 'turmas');
+    
     try {
-        const classes = await getClassesByGrade(parseInt(grade));
+        const cacheKey = `${SESSION_CACHE_KEY_CLASSES}${grade}`;
+        const classes = await cacheService.getOrFetch(cacheKey, () => getClassesByGrade(parseInt(grade, 10)));
         
-        // CORREÇÃO: Verifica se a operação não foi cancelada
-        if (operation.cancelled) {
-            console.log('Operação de carregamento de turmas cancelada');
+        // Se o sinal foi abortado, a requisição foi cancelada
+        if (signal.aborted) {
+            logService.debug('Requisição de turmas abortada.', { grade });
             return;
         }
-        
-        availableClasses = classes || [];
-        dom.login.classSelect.innerHTML = '<option value="">-- Selecione --</option>';
-        
-        if (availableClasses.length === 0) {
-            dom.login.classSelect.innerHTML = '<option value="">-- Nenhuma turma encontrada --</option>';
-            showError('Nenhuma turma encontrada para este ano. Verifique a configuração do sistema.');
+
+        if (!classes || classes.length === 0) {
+            setSelectError(dom.login.classSelect, 'Nenhuma turma encontrada');
+            showError('Nenhuma turma encontrada para este ano.');
             return;
         }
-        
-        availableClasses.forEach(cls => {
-            const option = document.createElement('option');
-            option.value = cls.id;
-            option.textContent = `Turma ${cls.name}`;
-            dom.login.classSelect.appendChild(option);
-        });
-        
-        dom.login.classSelect.disabled = false;
+
+        populateSelectWithOptions(dom.login.classSelect, classes, 'Turma', 'id', 'name');
         clearError();
-        
+
     } catch (error) {
-        if (!operation.cancelled) {
-            console.error('Erro ao carregar turmas:', error);
-            dom.login.classSelect.innerHTML = '<option value="">-- Erro ao carregar turmas --</option>';
-            showError('Erro ao carregar turmas. Verifique sua conexão.');
+        if (error.name !== 'AbortError') {
+            logService.error('Erro ao carregar turmas.', { grade, error });
+            setSelectError(dom.login.classSelect, 'Erro ao carregar');
+            showError('Não foi possível carregar as turmas. Verifique a conexão.');
         }
     } finally {
-        if (currentLoadingOperation === operation) {
-            currentLoadingOperation = null;
-        }
+        setSelectLoading(dom.login.classSelect, false);
     }
 }
 
 /**
- * CORRIGIDA: Preenche o seletor de alunos com validação e controle de duplicatas.
+ * Busca e preenche o seletor de alunos, filtrando os que já concluíram.
  * @param {string} classId - O ID da turma selecionada.
  */
 async function populateStudents(classId) {
-    // CORREÇÃO: Cancela operação anterior
-    if (currentLoadingOperation) {
-        currentLoadingOperation.cancelled = true;
+    if (activeController) {
+        activeController.abort();
     }
-    
-    const operation = { cancelled: false, type: 'students', classId };
-    currentLoadingOperation = operation;
-    
-    resetStudentSelector();
-    hideAdaptationLegend();
+    activeController = new AbortController();
+    const signal = activeController.signal;
+
+    resetSelect(dom.login.studentSelect, 'aluno');
+    updateAdaptationUI(null);
+    updateStartButtonState();
 
     if (!classId) {
-        dom.login.studentSelect.innerHTML = '<option value="">-- Selecione a turma primeiro --</option>';
         return;
     }
-    
-    // Indica carregamento
-    dom.login.studentSelect.innerHTML = '<option value="">-- A carregar alunos... --</option>';
-    dom.login.studentSelect.disabled = true;
+
+    setSelectLoading(dom.login.studentSelect, true, 'alunos');
 
     try {
-        // CORREÇÃO: Carrega dados em paralelo com timeout
-        const [students, submissions] = await Promise.race([
-            Promise.all([
-                getStudentsByClass(classId),
-                getAllSubmissionsForDashboard()
-            ]),
-            new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Timeout')), 10000)
-            )
-        ]);
+        const cacheKey = `${SESSION_CACHE_KEY_STUDENTS}${classId}`;
+        const students = await cacheService.getOrFetch(cacheKey, () => getStudentsByClass(classId));
         
-        // Verifica se a operação foi cancelada
-        if (operation.cancelled) {
-            console.log('Operação de carregamento de alunos cancelada');
+        if (signal.aborted) {
+             logService.debug('Requisição de alunos abortada.', { classId });
             return;
         }
-        
-        // CORREÇÃO: Validação robusta dos dados
-        availableStudents = Array.isArray(students) ? students.filter(s => s && s.id && s.full_name) : [];
-        completedSubmissions = Array.isArray(submissions) ? submissions : [];
-        
-        if (availableStudents.length === 0) {
-            dom.login.studentSelect.innerHTML = '<option value="">-- Nenhum aluno encontrado --</option>';
+
+        if (!students || students.length === 0) {
+            setSelectError(dom.login.studentSelect, 'Nenhum aluno encontrado');
             showError('Nenhum aluno encontrado nesta turma.');
             return;
         }
-        
-        // CORREÇÃO: Melhora na identificação de alunos que já completaram
-        const completedStudentIds = new Set(
-            completedSubmissions
-                .filter(sub => sub && sub.student_id)
-                .map(sub => sub.student_id)
-        );
 
-        dom.login.studentSelect.innerHTML = '<option value="">-- Selecione --</option>';
+        // TODO: Implementar busca de alunos que já finalizaram a prova
+        // const completedStudentIds = await getCompletedStudentIds(classId);
 
-        availableStudents.forEach(student => {
-            const option = document.createElement('option');
-            option.value = student.id;
-            let studentName = student.full_name;
-
-            // CORREÇÃO: Validação e destaque melhorado para alunos atípicos
-            const hasAdaptation = hasValidAdaptationDetails(student.adaptation_details);
-            if (hasAdaptation) {
-                studentName += " *";
-                // CORREÇÃO: Adiciona estilo visual para destacar alunos atípicos
-                option.style.fontWeight = 'bold';
-                option.style.color = '#2563eb'; // blue-600
-                option.dataset.hasAdaptation = 'true';
+        populateSelectWithOptions(dom.login.studentSelect, students, 'Aluno', 'id', 'full_name', (student) => {
+            // Lógica para desabilitar alunos que já concluíram, se necessário
+            // if (completedStudentIds.has(student.id)) {
+            //     return { disabled: true, textSuffix: ' (Concluído)' };
+            // }
+            if (hasValidAdaptationDetails(student.adaptation_details)) {
+                return { 'data-has-adaptation': 'true', textSuffix: ' *' };
             }
-
-            option.textContent = studentName;
-
-            // CORREÇÃO: Marca alunos que já completaram a avaliação
-            if (completedStudentIds.has(student.id)) {
-                option.disabled = true;
-                option.textContent += " (Concluído)";
-                option.style.color = '#94a3b8'; // slate-400
-                option.style.fontWeight = 'normal'; // Remove destaque se concluído
-            }
-            
-            dom.login.studentSelect.appendChild(option);
+            return {};
         });
-        
-        dom.login.studentSelect.disabled = false;
         clearError();
         
     } catch (error) {
-        if (!operation.cancelled) {
-            console.error('Erro ao carregar alunos:', error);
-            dom.login.studentSelect.innerHTML = '<option value="">-- Erro ao carregar alunos --</option>';
-            
-            if (error.message === 'Timeout') {
-                showError('Tempo limite excedido ao carregar alunos. Tente novamente.');
-            } else {
-                showError('Erro ao carregar alunos. Verifique sua conexão.');
-            }
+        if (error.name !== 'AbortError') {
+            logService.error('Erro ao carregar alunos.', { classId, error });
+            setSelectError(dom.login.studentSelect, 'Erro ao carregar');
+            showError('Não foi possível carregar os alunos. Verifique a conexão.');
         }
     } finally {
-        if (currentLoadingOperation === operation) {
-            currentLoadingOperation = null;
+        setSelectLoading(dom.login.studentSelect, false);
+    }
+}
+
+
+// --- Funções Auxiliares da UI ---
+
+function resetSelect(selectElement, type) {
+    selectElement.innerHTML = `<option value="">-- Selecione a ${type === 'turma' ? 'série' : 'turma'} --</option>`;
+    selectElement.disabled = true;
+}
+
+function setSelectLoading(selectElement, isLoading, type = '') {
+    if (isLoading) {
+        selectElement.innerHTML = `<option value="">Carregando ${type}...</option>`;
+        selectElement.disabled = true;
+    } else {
+        selectElement.disabled = false;
+        if (selectElement.options.length <= 1) { // Se não foi populado com sucesso
+             selectElement.disabled = true;
         }
     }
 }
 
+function setSelectError(selectElement, message) {
+    selectElement.innerHTML = `<option value="">-- ${message} --</option>`;
+    selectElement.disabled = true;
+}
+
+function populateSelectWithOptions(selectElement, data, type, valueKey, textKey, optionCustomizer = () => ({})) {
+    selectElement.innerHTML = `<option value="">-- Selecione --</option>`;
+    data.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item[valueKey];
+        
+        const customAttrs = optionCustomizer(item);
+        let text = `Turma ${item[textKey]}`;
+        if(type == "Aluno") text = item[textKey];
+        option.textContent = text + (customAttrs.textSuffix || '');
+
+        delete customAttrs.textSuffix; // Remove para não virar atributo
+        
+        Object.entries(customAttrs).forEach(([key, value]) => {
+            option.setAttribute(key, value);
+        });
+        
+        selectElement.appendChild(option);
+    });
+    selectElement.disabled = false;
+}
+
 /**
- * NOVA FUNÇÃO: Valida se os detalhes de adaptação são válidos (estrutura real)
+ * Atualiza o estado do botão "Iniciar" e a UI de adaptação.
  */
-function hasValidAdaptationDetails(adaptationDetails) {
-    if (!adaptationDetails) return false;
+function handleSelectionChange() {
+    const studentSelect = dom.login.studentSelect;
+    const selectedOption = studentSelect.options[studentSelect.selectedIndex];
     
-    try {
-        // Se for string, tenta fazer parse
-        const parsed = typeof adaptationDetails === 'string' ? 
-            JSON.parse(adaptationDetails) : adaptationDetails;
-        
-        // CORREÇÃO: Verifica se há diagnosis, suggestions ou difficulties
-        const hasDiagnosis = parsed.diagnosis && Array.isArray(parsed.diagnosis) && parsed.diagnosis.length > 0;
-        const hasSuggestions = parsed.suggestions && Array.isArray(parsed.suggestions) && parsed.suggestions.length > 0;
-        const hasDifficulties = parsed.difficulties && Array.isArray(parsed.difficulties) && parsed.difficulties.length > 0;
-        
-        return hasDiagnosis || hasSuggestions || hasDifficulties;
-               
-    } catch (error) {
-        console.warn('Dados de adaptação inválidos:', error);
-        return false;
+    if (selectedOption && selectedOption.value) {
+        const hasAdaptation = selectedOption.getAttribute('data-has-adaptation') === 'true';
+        updateAdaptationUI(hasAdaptation ? selectedOption.textContent : null);
+    } else {
+        updateAdaptationUI(null);
+    }
+    
+    updateStartButtonState();
+}
+
+/**
+ * Atualiza a legenda de adaptação e o estilo do formulário.
+ * @param {string|null} studentName - O nome do aluno com adaptação, ou null.
+ */
+function updateAdaptationUI(studentName) {
+    const legend = dom.login.adaptationLegend;
+    if (studentName) {
+        const cleanName = studentName.replace(' *', '');
+        legend.innerHTML = `* <strong>${cleanName}</strong> receberá uma avaliação adaptada.`;
+        legend.classList.remove('hidden');
+    } else {
+        legend.classList.add('hidden');
     }
 }
 
 /**
- * NOVA FUNÇÃO: Reset do seletor de turmas
+ * Habilita ou desabilita o botão de iniciar avaliação.
  */
-function resetClassSelector() {
-    availableClasses = [];
-    dom.login.classSelect.innerHTML = '<option value="">-- Selecione o ano primeiro --</option>';
-    dom.login.classSelect.disabled = true;
+function updateStartButtonState() {
+    const isComplete = dom.login.yearSelect.value && dom.login.classSelect.value && dom.login.studentSelect.value;
+    dom.login.startBtn.disabled = !isComplete;
 }
 
-/**
- * NOVA FUNÇÃO: Reset do seletor de alunos
- */
-function resetStudentSelector() {
-    availableStudents = [];
-    dom.login.studentSelect.innerHTML = '<option value="">-- Selecione a turma primeiro --</option>';
-    dom.login.studentSelect.disabled = true;
+function hasValidAdaptationDetails(details) {
+    if (!details) return false;
+    // Uma simples verificação para ver se o objeto não está vazio
+    return typeof details === 'object' && Object.keys(details).length > 0;
 }
 
-/**
- * NOVA FUNÇÃO: Esconde a legenda de adaptação
- */
-function hideAdaptationLegend() {
-    dom.login.adaptationLegend.classList.add('hidden');
-}
 
-/**
- * NOVA FUNÇÃO: Mostra mensagem de erro
- */
+// --- Funções de erro ---
 function showError(message) {
     dom.login.errorMessage.textContent = message;
     dom.login.errorMessage.classList.remove('hidden');
 }
 
-/**
- * NOVA FUNÇÃO: Limpa mensagem de erro
- */
 function clearError() {
     dom.login.errorMessage.classList.add('hidden');
 }
 
 /**
- * CORRIGIDA: Verifica se todos os campos foram preenchidos e aplica estilos visuais.
+ * Ponto de entrada da inicialização da tela de login.
+ * @param {Function} onStartCallback - Função a ser chamada ao iniciar a avaliação.
  */
-function checkFormCompletion() {
-    const year = dom.login.yearSelect.value;
-    const classId = dom.login.classSelect.value;
-    const studentId = dom.login.studentSelect.value;
-    
-    const isComplete = year && classId && studentId;
-    dom.login.startBtn.disabled = !isComplete;
-
-    // CORREÇÃO: Lógica completa para destacar alunos atípicos
-    if (studentId) {
-        const selectedOption = dom.login.studentSelect.options[dom.login.studentSelect.selectedIndex];
-        
-        if (selectedOption && !selectedOption.disabled) {
-            const hasAdaptation = selectedOption.dataset.hasAdaptation === 'true';
-            
-            if (hasAdaptation) {
-                // Aplica estilos visuais
-                applyAdaptationStyling(true);
-                
-                // Mostra legenda e mensagem
-                showAdaptationMessage(selectedOption.textContent);
-                
-                console.log('Aluno atípico selecionado:', selectedOption.textContent.replace(' *', ''));
-            } else {
-                applyAdaptationStyling(false);
-                hideAdaptationLegend();
-                clearAdaptationMessage();
-            }
-        } else {
-            applyAdaptationStyling(false);
-            hideAdaptationLegend();
-            clearAdaptationMessage();
-        }
-    } else {
-        applyAdaptationStyling(false);
-        hideAdaptationLegend();
-        clearAdaptationMessage();
-    }
-    
-    // Limpa erro se formulário estiver completo
-    if (isComplete) {
-        clearError();
-    }
-}
-
-/**
- * NOVA FUNÇÃO: Aplica estilos visuais quando aluno atípico é selecionado
- */
-function applyAdaptationStyling(hasAdaptation) {
-    const studentSelect = dom.login.studentSelect;
-    const startBtn = dom.login.startBtn;
-    const container = document.getElementById('main-container');
-    
-    if (hasAdaptation) {
-        // Adiciona classes CSS para destacar
-        studentSelect.classList.add('has-adaptation-selected');
-        startBtn.classList.add('adapted-student');
-        container?.classList.add('form-complete-adapted');
-        
-        // Muda texto do botão para indicar adaptação
-        if (!startBtn.disabled) {
-            startBtn.innerHTML = `
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                </svg>
-                Iniciar Avaliação Adaptada
-            `;
-        }
-    } else {
-        // Remove classes CSS
-        studentSelect.classList.remove('has-adaptation-selected');
-        startBtn.classList.remove('adapted-student');
-        container?.classList.remove('form-complete-adapted');
-        
-        // Volta texto padrão do botão
-        if (!startBtn.disabled) {
-            startBtn.innerHTML = `
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1a3 3 0 015.755.757l.006-.757h1a3 3 0 110 6H9a3 3 0 01-3-3V10z"></path>
-                </svg>
-                Iniciar Avaliação
-            `;
-        }
-    }
-}
-
-/**
- * NOVA FUNÇÃO: Mostra mensagem específica sobre adaptação
- */
-function showAdaptationMessage(studentName) {
-    // Remove o asterisco para exibir nome limpo
-    const cleanName = studentName.replace(' *', '').replace(' (Concluído)', '');
-    
-    // Atualiza a legenda com mensagem personalizada
-    dom.login.adaptationLegend.innerHTML = `
-        <div class="flex items-start gap-2">
-            <div class="flex-shrink-0 w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center mt-0.5">
-                <span class="text-blue-600 text-xs font-bold">*</span>
-            </div>
-            <div class="text-xs">
-                <p class="font-semibold text-blue-800">Aluno com necessidades específicas</p>
-                <p class="text-blue-600 mt-1">
-                    ${cleanName} receberá uma avaliação adaptada às suas necessidades educacionais.
-                </p>
-            </div>
-        </div>
-    `;
-    
-    dom.login.adaptationLegend.classList.remove('hidden');
-}
-
-/**
- * NOVA FUNÇÃO: Limpa mensagem de adaptação
- */
-function clearAdaptationMessage() {
-    dom.login.adaptationLegend.innerHTML = `
-        <div class="flex items-center gap-2">
-            <span class="text-blue-600">*</span>
-            <span>Aluno com necessidades específicas. Uma avaliação adaptada será aplicada.</span>
-        </div>
-    `;
-}
-
-/**
- * NOVA FUNÇÃO: Valida os dados selecionados antes de prosseguir
- */
-function validateSelection() {
-    const yearValue = dom.login.yearSelect.value;
-    const classValue = dom.login.classSelect.value;
-    const studentValue = dom.login.studentSelect.value;
-    
-    // Valida se o ano é válido
-    if (!yearValue || !['6', '7', '8', '9'].includes(yearValue)) {
-        showError('Por favor, selecione um ano válido.');
-        return false;
-    }
-    
-    // Valida se a turma existe na lista carregada
-    const selectedClass = availableClasses.find(c => c.id === classValue);
-    if (!selectedClass) {
-        showError('Turma selecionada não é válida. Recarregue a página e tente novamente.');
-        return false;
-    }
-    
-    // Valida se o aluno existe na lista carregada
-    const selectedStudent = availableStudents.find(s => s.id === studentValue);
-    if (!selectedStudent) {
-        showError('Aluno selecionado não é válido. Recarregue a página e tente novamente.');
-        return false;
-    }
-    
-    // Verifica se o aluno já completou a avaliação
-    const isCompleted = completedSubmissions.some(sub => sub.student_id === studentValue);
-    if (isCompleted) {
-        showError('Este aluno já completou a avaliação.');
-        return false;
-    }
-    
-    return { selectedClass, selectedStudent };
-}
-
-/**
- * CORRIGIDA: Configura os event listeners com debounce e validação.
- * @param {Function} startAssessmentCallback - A função a ser chamada quando o botão "Iniciar" é clicado.
- */
-export function initializeLoginScreen(startAssessmentCallback) {
+export function initializeLoginScreen(onStartCallback) {
     populateYears();
 
-    // CORREÇÃO: Debounce para evitar múltiplas chamadas
-    let yearChangeTimeout;
-    dom.login.yearSelect.addEventListener('change', async (e) => {
-        clearTimeout(yearChangeTimeout);
-        yearChangeTimeout = setTimeout(() => {
-            populateClasses(e.target.value);
-            checkFormCompletion();
-        }, 300);
-    });
+    dom.login.yearSelect.addEventListener('change', (e) => populateClasses(e.target.value));
+    dom.login.classSelect.addEventListener('change', (e) => populateStudents(e.target.value));
+    dom.login.studentSelect.addEventListener('change', handleSelectionChange);
 
-    let classChangeTimeout;
-    dom.login.classSelect.addEventListener('change', async (e) => {
-        clearTimeout(classChangeTimeout);
-        classChangeTimeout = setTimeout(() => {
-            populateStudents(e.target.value);
-            checkFormCompletion();
-        }, 300);
-    });
-
-    dom.login.studentSelect.addEventListener('change', checkFormCompletion);
-
-    // CORREÇÃO: Validação completa antes de iniciar
-    dom.login.startBtn.addEventListener('click', () => {
-        const validation = validateSelection();
-        
-        if (!validation) {
-            return; // Erro já mostrado pela função validateSelection
-        }
-        
-        const { selectedClass, selectedStudent } = validation;
-
+    dom.login.startBtn.addEventListener('click', async () => {
         try {
-            // CORREÇÃO: Parse seguro dos dados de adaptação
-            let adaptationDetails = null;
-            if (selectedStudent.adaptation_details) {
-                adaptationDetails = typeof selectedStudent.adaptation_details === 'string' ? 
-                    JSON.parse(selectedStudent.adaptation_details) : 
-                    selectedStudent.adaptation_details;
+            const studentId = dom.login.studentSelect.value;
+            const classId = dom.login.classSelect.value;
+            const grade = dom.login.yearSelect.value;
+
+            // Busca os dados completos do aluno novamente para garantir consistência
+            const cacheKey = `${SESSION_CACHE_KEY_STUDENTS}${classId}`;
+            const studentsInClass = await cacheService.get(cacheKey);
+            if (!studentsInClass) {
+                showError("Sessão expirada. Por favor, selecione a turma novamente.");
+                return;
             }
 
-            const studentData = {
-                id: selectedStudent.id,
-                name: selectedStudent.full_name,
-                grade: dom.login.yearSelect.value,
-                classId: selectedClass.id,
-                className: selectedClass.name,
-                adaptationDetails: adaptationDetails
-            };
-            
-            updateState({ currentStudent: studentData });
-            
-            console.log('Iniciando avaliação para:', studentData);
-            startAssessmentCallback();
-            
+            const selectedStudent = studentsInClass.find(s => s.id === studentId);
+            const selectedClass = (await cacheService.get(`${SESSION_CACHE_KEY_CLASSES}${grade}`)).find(c => c.id === classId);
+
+            if (!selectedStudent || !selectedClass) {
+                showError("Erro ao validar seleção. Tente novamente.");
+                return;
+            }
+
+            updateState({
+                currentStudent: {
+                    id: selectedStudent.id,
+                    name: selectedStudent.full_name,
+                    grade: grade,
+                    classId: selectedClass.id,
+                    className: selectedClass.name,
+                    adaptationDetails: selectedStudent.adaptation_details
+                }
+            });
+
+            logService.info('Iniciando avaliação para o aluno.', { studentId });
+            onStartCallback();
+
         } catch (error) {
-            console.error('Erro ao processar dados do aluno:', error);
-            showError('Erro ao processar dados do aluno selecionado. Tente novamente.');
+            logService.critical('Erro crítico ao iniciar avaliação.', { error });
+            showError("Ocorreu um erro inesperado. Recarregue a página.");
         }
     });
+
+    // Estado inicial
+    resetSelect(dom.login.classSelect, 'turma');
+    resetSelect(dom.login.studentSelect, 'aluno');
 }

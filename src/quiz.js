@@ -1,143 +1,115 @@
-// src/quiz.js - VERSÃO CORRIGIDA
+// src/quiz.js - VERSÃO CORRIGIDA E ROBUSTA
 
 import { state, dom, updateState } from './state.js';
 import { showScreen } from './navigation.js';
 import { getAssessmentData, saveSubmission } from './database.js';
 import { showConfirmationModal, handleVisibilityChange } from './ui.js';
 import { routeAssessment } from './adaptation.js';
+import { logService } from './services/logService.js';
 
 /**
- * CORRIGIDA: Ponto de entrada principal para iniciar o fluxo da avaliação.
+ * Ponto de entrada principal para iniciar o fluxo da avaliação.
+ * Valida os dados do aluno e busca os dados da avaliação.
  */
 export async function startAssessmentFlow() {
     try {
-        // CORREÇÃO: Validação do estado atual
-        if (!state.currentStudent || !state.currentStudent.id || !state.currentStudent.grade) {
-            console.error('Dados do estudante inválidos:', state.currentStudent);
-            dom.login.errorMessage.textContent = 'Erro: Dados do estudante não encontrados. Recarregue a página.';
-            dom.login.errorMessage.classList.remove('hidden');
+        if (!state.currentStudent?.id || !state.currentStudent?.grade) {
+            logService.critical('startAssessmentFlow chamado sem dados de estudante válidos.', { student: state.currentStudent });
+            showErrorOnLogin('Erro: Dados do estudante estão incompletos. Por favor, reinicie o processo.');
             return;
         }
 
-        console.log('Carregando avaliação para o aluno:', state.currentStudent.name, `(${state.currentStudent.grade}º ano)`);
-        
-        const assessment = await getAssessmentData(parseInt(state.currentStudent.grade));
+        logService.info('Iniciando fluxo da avaliação', { studentName: state.currentStudent.name, grade: state.currentStudent.grade });
 
-        // CORREÇÃO: Validação robusta da avaliação
+        const assessment = await getAssessmentData(parseInt(state.currentStudent.grade, 10));
+
         const validationError = validateAssessmentData(assessment);
         if (validationError) {
-            dom.login.errorMessage.textContent = validationError;
-            dom.login.errorMessage.classList.remove('hidden');
+            logService.error('Falha na validação dos dados da avaliação.', { error: validationError, assessmentId: assessment?.id });
+            showErrorOnLogin(validationError);
             return;
         }
+
+        logService.info('Avaliação carregada com sucesso.', { title: assessment.title, questionCount: assessment.questions.length });
         
-        console.log('Avaliação carregada com sucesso:', assessment.title, `(${assessment.questions.length} questões)`);
-        
-        // Entrega os dados da prova ao roteador de adaptação
+        // O roteador de adaptação decidirá qual tipo de prova iniciar.
         routeAssessment(assessment);
-        
+
     } catch (error) {
-        console.error('Erro no fluxo de inicialização da avaliação:', error);
-        dom.login.errorMessage.textContent = 'Erro inesperado ao carregar a avaliação. Tente novamente.';
-        dom.login.errorMessage.classList.remove('hidden');
+        logService.critical('Erro crítico no fluxo de inicialização da avaliação.', { error });
+        showErrorOnLogin('Ocorreu um erro inesperado ao carregar a avaliação. Tente novamente.');
     }
 }
 
 /**
- * NOVA FUNÇÃO: Validação abrangente dos dados da avaliação
+ * Valida a integridade dos dados da avaliação recebidos do banco.
+ * @param {object} assessment - O objeto da avaliação.
+ * @returns {string|null} - Uma string de erro se inválido, ou null se válido.
  */
 function validateAssessmentData(assessment) {
-    if (!assessment) {
-        return `Nenhuma prova foi encontrada para o ${state.currentStudent.grade}º ano. Verifique com o professor.`;
+    if (!assessment || !assessment.id) {
+        return `Nenhuma prova foi encontrada para o ${state.currentStudent.grade}º ano. Por favor, verifique com o professor.`;
     }
-    
-    if (!assessment.questions || !Array.isArray(assessment.questions)) {
-        return 'Erro: Estrutura de questões inválida na avaliação.';
+    if (!assessment.questions || !Array.isArray(assessment.questions) || assessment.questions.length === 0) {
+        return `A prova para o ${state.currentStudent.grade}º ano não contém questões.`;
     }
-    
-    if (assessment.questions.length === 0) {
-        return `Nenhuma questão encontrada para o ${state.currentStudent.grade}º ano.`;
-    }
-    
-    // Valida cada questão
-    for (let i = 0; i < assessment.questions.length; i++) {
-        const question = assessment.questions[i];
-        
-        if (!question.id || !question.question_text) {
-            return `Questão ${i + 1} tem estrutura inválida (ID ou texto ausente).`;
+    for (const [index, q] of assessment.questions.entries()) {
+        if (!q.id || !q.question_text) {
+            return `A questão ${index + 1} possui uma estrutura inválida.`;
         }
-        
-        if (!question.options || !Array.isArray(question.options) || question.options.length < 2) {
-            return `Questão ${i + 1} não tem opções suficientes.`;
+        if (!q.options || !Array.isArray(q.options) || q.options.length < 2) {
+            return `A questão ${index + 1} ("${q.question_text.substring(0, 20)}...") não possui opções suficientes.`;
         }
-        
-        const correctOptions = question.options.filter(opt => opt.isCorrect === true);
-        if (correctOptions.length !== 1) {
-            return `Questão ${i + 1} deve ter exatamente uma resposta correta.`;
-        }
-        
-        // Verifica se todas as opções têm texto
-        const invalidOptions = question.options.filter(opt => !opt.text || opt.text.trim() === '');
-        if (invalidOptions.length > 0) {
-            return `Questão ${i + 1} contém opções sem texto.`;
+        if (q.options.filter(opt => opt.isCorrect === true).length !== 1) {
+            return `A questão ${index + 1} ("${q.question_text.substring(0, 20)}...") deve ter exatamente uma resposta correta.`;
         }
     }
-    
-    return null; // Sem erros
+    return null; // Validação passou
 }
 
 /**
- * CORRIGIDA: Inicia a prova padrão com melhor controle de erro.
- * @param {object} assessmentData - Os dados da prova a serem carregados.
+ * Inicia a prova no formato padrão de múltipla escolha.
+ * @param {object} assessmentData - Os dados da avaliação.
  */
 export function startStandardAssessment(assessmentData) {
     try {
-        // CORREÇÃO: Validação adicional antes de iniciar
-        const validationError = validateAssessmentData(assessmentData);
-        if (validationError) {
-            console.error('Erro na validação da avaliação:', validationError);
-            alert('Erro na avaliação: ' + validationError);
-            return;
-        }
+        // Embaralha as questões para cada aluno e as opções de cada questão
+        const processedQuestions = shuffleArray(assessmentData.questions).map(q => ({
+            ...q,
+            options: shuffleArray(q.options)
+        }));
 
-        // Embaralha as questões para cada aluno
-        const shuffledQuestions = shuffleArray(assessmentData.questions);
-
-        // CORREÇÃO: Reset completo do estado
-        updateState({ 
-            currentAssessment: { ...assessmentData, questions: shuffledQuestions },
+        updateState({
+            currentAssessment: { ...assessmentData, questions: processedQuestions },
             currentQuestionIndex: 0,
             score: 0,
             answerLog: [],
             questionStartTime: null,
             assessmentStartTime: Date.now()
         });
-        
-        // CORREÇÃO: Informações mais detalhadas do aluno
-        const studentInfo = `
-            <strong>Aluno:</strong> ${state.currentStudent.name}<br>
-            <strong>Turma:</strong> ${state.currentStudent.grade}º Ano ${state.currentStudent.className}<br>
-            <strong>Avaliação:</strong> ${assessmentData.title}
-        `;
+
+        const studentInfo = `<b>Aluno(a):</b> ${state.currentStudent.name} | <b>Turma:</b> ${state.currentStudent.grade}º Ano ${state.currentStudent.className}`;
         dom.quiz.studentInfoDisplay.innerHTML = studentInfo;
-        
+
         loadQuestion();
         showScreen('quiz');
-        
-        // CORREÇÃO: Adiciona listener apenas uma vez
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+        // Adiciona monitoramento de visibilidade da aba
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        
-        console.log('Prova iniciada com sucesso');
-        
+
+        logService.info('Prova padrão iniciada.', { studentId: state.currentStudent.id, assessmentId: assessmentData.id });
+
     } catch (error) {
-        console.error('Erro ao iniciar avaliação padrão:', error);
-        alert('Erro inesperado ao iniciar a avaliação. Recarregue a página e tente novamente.');
+        logService.critical('Erro ao iniciar a avaliação padrão.', { error });
+        alert('Ocorreu um erro crítico ao iniciar a prova. A página será recarregada.');
+        window.location.reload();
     }
 }
 
 /**
- * CORRIGIDA: Embaralha os elementos de um array (algoritmo Fisher-Yates)
+ * Algoritmo de Fisher-Yates para embaralhar um array de forma imparcial.
+ * @param {Array} array - O array a ser embaralhado.
+ * @returns {Array} - Um novo array com os elementos embaralhados.
  */
 function shuffleArray(array) {
     const shuffled = [...array];
@@ -149,344 +121,176 @@ function shuffleArray(array) {
 }
 
 /**
- * CORRIGIDA: Carrega e exibe a questão atual na tela com validação.
+ * Carrega a questão atual na interface do quiz.
  */
 function loadQuestion() {
     try {
-        // CORREÇÃO: Validação do índice da questão
-        if (state.currentQuestionIndex >= state.currentAssessment.questions.length) {
-            console.error('Índice de questão inválido:', state.currentQuestionIndex);
-            finishAssessment();
-            return;
-        }
+        const question = state.currentAssessment.questions[state.currentQuestionIndex];
 
-        const questionData = state.currentAssessment.questions[state.currentQuestionIndex];
-        
-        // CORREÇÃO: Validação da questão atual
-        if (!questionData || !questionData.question_text || !Array.isArray(questionData.options)) {
-            console.error('Dados da questão inválidos:', questionData);
-            showQuestionError();
-            return;
-        }
-
-        // Reset da interface
-        dom.quiz.nextBtn.classList.add('hidden');
-        dom.quiz.feedback.textContent = '';
-        dom.quiz.feedback.style.color = '';
-        
         updateState({ questionStartTime: Date.now() });
-        
-        // CORREÇÃO: Validação do texto base
-        const baseText = state.currentAssessment.baseText || 'Texto de apoio não disponível.';
-        dom.quiz.baseTextDesktop.innerHTML = baseText;
-        dom.quiz.baseTextMobile.innerHTML = baseText;
-        
-        // Informações da questão
+
+        // Atualiza UI
         dom.quiz.progress.textContent = `Pergunta ${state.currentQuestionIndex + 1} de ${state.currentAssessment.questions.length}`;
-        dom.quiz.question.textContent = questionData.question_text;
-        
-        // CORREÇÃO: Validação das opções
-        const validOptions = questionData.options.filter(opt => opt && opt.text && opt.text.trim() !== '');
-        if (validOptions.length < 2) {
-            console.error('Questão sem opções válidas suficientes:', questionData.id);
-            showQuestionError();
-            return;
-        }
-        
-        const correctOptions = validOptions.filter(opt => opt.isCorrect === true);
-        if (correctOptions.length !== 1) {
-            console.error('Questão sem resposta correta única:', questionData.id);
-            showQuestionError();
-            return;
-        }
+        dom.quiz.question.textContent = question.question_text;
+        dom.quiz.baseTextDesktop.innerHTML = state.currentAssessment.baseText || '';
+        dom.quiz.baseTextMobile.innerHTML = state.currentAssessment.baseText || '';
+        dom.quiz.feedback.textContent = '';
+        dom.quiz.nextBtn.classList.add('hidden');
 
-        // Limpa container de opções
+        // Renderiza as opções
         dom.quiz.optionsContainer.innerHTML = '';
-
-        const correctAnswer = correctOptions[0].text;
-
-        // CORREÇÃO: Embaralha as opções para cada questão
-        const shuffledOptions = shuffleArray(validOptions);
-        
-        shuffledOptions.forEach((option, index) => {
+        question.options.forEach(option => {
             const button = document.createElement('button');
             button.textContent = option.text;
             button.classList.add('option-btn');
-            button.dataset.optionId = `option-${index}`;
-            button.addEventListener('click', () => selectAnswer(button, correctAnswer, questionData.id));
+            button.addEventListener('click', () => selectAnswer(button, option.isCorrect, question.id));
             dom.quiz.optionsContainer.appendChild(button);
         });
-        
-        console.log(`Questão ${state.currentQuestionIndex + 1} carregada: ${questionData.question_text.substring(0, 50)}...`);
-        
     } catch (error) {
-        console.error('Erro ao carregar questão:', error);
-        showQuestionError();
+        logService.critical('Falha ao carregar a questão.', { questionIndex: state.currentQuestionIndex, error });
+        dom.quiz.question.textContent = 'Erro ao carregar esta questão.';
+        dom.quiz.optionsContainer.innerHTML = '<p class="text-red-600">Não foi possível exibir as opções. Por favor, notifique o professor.</p>';
     }
 }
 
 /**
- * NOVA FUNÇÃO: Mostra erro quando não consegue carregar questão
+ * Processa a resposta selecionada pelo aluno.
+ * @param {HTMLButtonElement} selectedButton - O botão que foi clicado.
+ * @param {boolean} isCorrect - Se a opção selecionada é a correta.
+ * @param {string} questionId - O ID da questão respondida.
  */
-function showQuestionError() {
-    dom.quiz.question.textContent = 'Erro ao carregar esta questão.';
-    dom.quiz.optionsContainer.innerHTML = `
-        <div class="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
-            <p class="font-semibold">Erro na questão</p>
-            <p class="text-sm mt-1">Esta questão não pôde ser carregada devido a um problema nos dados.</p>
-            <button class="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" onclick="location.reload()">
-                Recarregar Página
-            </button>
-        </div>
-    `;
-}
+function selectAnswer(selectedButton, isCorrect, questionId) {
+    const duration = Math.round((Date.now() - state.questionStartTime) / 1000);
 
-/**
- * CORRIGIDA: Processa a seleção de uma resposta pelo aluno com validações.
- */
-function selectAnswer(selectedButton, correctAnswer, questionId) {
-    try {
-        // CORREÇÃO: Validação dos parâmetros
-        if (!selectedButton || !correctAnswer || !questionId) {
-            console.error('Parâmetros inválidos na seleção de resposta');
-            return;
-        }
+    state.answerLog.push({
+        questionId: questionId,
+        isCorrect: isCorrect,
+        duration: Math.max(1, duration) // Garante que a duração seja no mínimo 1s
+    });
 
-        // CORREÇÃO: Validação do tempo de resposta
-        if (!state.questionStartTime || state.questionStartTime <= 0) {
-            console.warn('Tempo de início da questão não registrado, usando valor padrão');
-            updateState({ questionStartTime: Date.now() - 1000 }); // 1 segundo atrás
-        }
-
-        const duration = Math.max(1, Math.round((Date.now() - state.questionStartTime) / 1000));
-        const isCorrect = selectedButton.textContent.trim() === correctAnswer.trim();
-
-        // CORREÇÃO: Validação do log de respostas
-        if (!Array.isArray(state.answerLog)) {
-            updateState({ answerLog: [] });
-        }
-
-        // CORREÇÃO: Log mais detalhado
-        const answerData = {
-            questionId: questionId,
-            selectedAnswer: selectedButton.textContent.trim(),
-            correctAnswer: correctAnswer.trim(),
-            isCorrect: isCorrect,
-            duration: duration,
-            questionIndex: state.currentQuestionIndex,
-            timestamp: Date.now()
-        };
-
-        state.answerLog.push(answerData);
-
-        // Desabilita todas as opções
-        const allOptions = dom.quiz.optionsContainer.querySelectorAll('.option-btn');
-        allOptions.forEach(btn => {
-            btn.disabled = true;
-            if (btn.textContent.trim() === correctAnswer.trim()) {
-                btn.classList.add('correct');
-            } else if (btn === selectedButton && !isCorrect) {
-                btn.classList.add('incorrect');
-            }
-        });
-
-        // CORREÇÃO: Atualização segura do score
-        if (isCorrect) {
-            const newScore = (state.score || 0) + 1;
-            updateState({ score: newScore });
-            dom.quiz.feedback.textContent = "Resposta Correta!";
-            dom.quiz.feedback.style.color = 'green';
-        } else {
-            dom.quiz.feedback.textContent = `Incorreto. A resposta certa era: "${correctAnswer}"`;
-            dom.quiz.feedback.style.color = 'red';
-        }
-        
-        // Configura botão de próxima
-        dom.quiz.nextBtn.classList.remove('hidden');
-        if (state.currentQuestionIndex === state.currentAssessment.questions.length - 1) {
-            dom.quiz.nextBtn.textContent = "Finalizar Avaliação";
-        } else {
-            dom.quiz.nextBtn.textContent = "Próxima Pergunta";
-        }
-
-        console.log(`Resposta registrada - Correta: ${isCorrect}, Duração: ${duration}s`);
-        
-    } catch (error) {
-        console.error('Erro ao processar resposta:', error);
-        dom.quiz.feedback.textContent = 'Erro ao registrar resposta. Tente novamente.';
+    if (isCorrect) {
+        updateState({ score: state.score + 1 });
+        dom.quiz.feedback.textContent = "Resposta Correta!";
+        dom.quiz.feedback.style.color = 'green';
+    } else {
+        dom.quiz.feedback.textContent = "Resposta Incorreta.";
         dom.quiz.feedback.style.color = 'red';
     }
+
+    // Feedback visual para todas as opções
+    const allOptions = dom.quiz.optionsContainer.querySelectorAll('.option-btn');
+    const questions = state.currentAssessment.questions[state.currentQuestionIndex];
+    allOptions.forEach(btn => {
+        btn.disabled = true;
+        const optionText = btn.textContent;
+        const originalOption = questions.options.find(opt => opt.text === optionText);
+        if (originalOption?.isCorrect) {
+            btn.classList.add('correct');
+        } else if (btn === selectedButton && !isCorrect) {
+            btn.classList.add('incorrect');
+        }
+    });
+
+    // Configura o botão de "Próxima"
+    dom.quiz.nextBtn.classList.remove('hidden');
+    if (state.currentQuestionIndex === state.currentAssessment.questions.length - 1) {
+        dom.quiz.nextBtn.textContent = "Finalizar Avaliação";
+    } else {
+        dom.quiz.nextBtn.textContent = "Próxima Pergunta";
+    }
 }
 
 /**
- * CORRIGIDA: Avança para a próxima questão ou inicia o processo de finalização.
+ * Avança para a próxima questão ou inicia o processo de finalização.
  */
 function nextQuestion() {
-    try {
-        if (state.currentQuestionIndex === state.currentAssessment.questions.length - 1) {
-            showConfirmationModal();
-        } else {
-            const nextIndex = state.currentQuestionIndex + 1;
-            updateState({ currentQuestionIndex: nextIndex });
-            loadQuestion();
-        }
-    } catch (error) {
-        console.error('Erro ao avançar questão:', error);
-        alert('Erro ao carregar próxima questão. A avaliação será finalizada.');
-        finishAssessment();
+    if (state.currentQuestionIndex < state.currentAssessment.questions.length - 1) {
+        updateState({ currentQuestionIndex: state.currentQuestionIndex + 1 });
+        loadQuestion();
+    } else {
+        showConfirmationModal();
     }
 }
 
 /**
- * CORRIGIDA: Finaliza a avaliação com validação completa dos dados.
+ * Finaliza a avaliação, salva os dados e mostra a tela de resultados.
  */
 export async function finishAssessment() {
-    try {
-        console.log('Iniciando finalização da avaliação...');
-        
-        // Remove listener de visibilidade
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        
-        // CORREÇÃO: Validação do estado antes de finalizar
-        const validationError = validateFinalizationData();
-        if (validationError) {
-            console.error('Erro na validação final:', validationError);
-            alert('Erro na finalização: ' + validationError);
-            return;
-        }
+    logService.info('Iniciando finalização da avaliação.', { studentId: state.currentStudent.id });
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
 
-        // CORREÇÃO: Cálculo seguro da duração
-        const assessmentStart = state.assessmentStartTime || Date.now();
-        const totalDuration = Math.max(1, Math.round((Date.now() - assessmentStart) / 1000));
+    const totalDuration = Math.round((Date.now() - state.assessmentStartTime) / 1000);
+    const submissionData = {
+        studentId: state.currentStudent.id,
+        assessmentId: state.currentAssessment.id,
+        score: state.score,
+        totalQuestions: state.currentAssessment.questions.length,
+        totalDuration: Math.max(1, totalDuration),
+        answerLog: state.answerLog,
+        // Inclui metadados para o modo offline
+        studentName: state.currentStudent.name,
+        assessmentTitle: state.currentAssessment.title,
+        grade: state.currentStudent.grade,
+        classId: state.currentStudent.classId,
+        className: state.currentStudent.className
+    };
 
-        // CORREÇÃO: Preparação robusta dos dados de submissão
-        const submissionData = {
-            studentId: state.currentStudent.id,
-            assessmentId: state.currentAssessment.id,
-            score: Math.max(0, Math.min(state.score || 0, state.currentAssessment.questions.length)),
-            totalQuestions: state.currentAssessment.questions.length,
-            totalDuration: totalDuration,
-            answerLog: prepareAnswerLogForSubmission(state.answerLog || [])
-        };
+    displayFinalScore(submissionData.score, submissionData.totalQuestions);
+    showScreen('results');
+    dom.results.saveStatus.textContent = 'Salvando resultado...';
 
-        console.log('Dados de submissão preparados:', {
-            student: state.currentStudent.name,
-            score: `${submissionData.score}/${submissionData.totalQuestions}`,
-            duration: `${totalDuration}s`,
-            answers: submissionData.answerLog.length
-        });
+    const saveResult = await saveSubmission(submissionData);
+    displaySaveResult(saveResult);
 
-        // CORREÇÃO: Tentativa de salvamento com feedback
-        dom.results.saveStatus.textContent = 'Salvando resultado...';
-        dom.results.saveStatus.style.color = '#64748b'; // slate-500
-        
-        const saveResult = await saveSubmission(submissionData);
-        
-        // CORREÇÃO: Feedback detalhado baseado no resultado
-        displaySaveResult(saveResult);
-        
-        // CORREÇÃO: Bloqueia dispositivo apenas se salvamento foi bem-sucedido
-        if (saveResult.success) {
-            localStorage.setItem('deviceLocked', 'true');
-        }
-
-        // CORREÇÃO: Cálculo e exibição da nota final
-        displayFinalScore(submissionData.score, submissionData.totalQuestions);
-        
-        showScreen('results');
-        console.log('Avaliação finalizada com sucesso');
-        
-    } catch (error) {
-        console.error('Erro crítico na finalização:', error);
-        
-        // CORREÇÃO: Fallback de emergência
-        dom.results.saveStatus.textContent = 'Erro crítico ao finalizar. Os dados podem não ter sido salvos.';
-        dom.results.saveStatus.style.color = 'red';
-        
-        // Tenta mostrar a tela de resultados mesmo com erro
-        displayFinalScore(state.score || 0, (state.currentAssessment?.questions?.length || 1));
-        showScreen('results');
+    // Bloqueia o dispositivo apenas se o salvamento (online ou offline) foi bem-sucedido
+    if (saveResult.success) {
+        localStorage.setItem('deviceLocked', 'true');
     }
 }
 
 /**
- * NOVA FUNÇÃO: Validação dos dados antes da finalização
- */
-function validateFinalizationData() {
-    if (!state.currentStudent || !state.currentStudent.id) {
-        return 'Dados do estudante não encontrados.';
-    }
-    
-    if (!state.currentAssessment || !state.currentAssessment.id) {
-        return 'Dados da avaliação não encontrados.';
-    }
-    
-    if (!state.currentAssessment.questions || state.currentAssessment.questions.length === 0) {
-        return 'Nenhuma questão encontrada na avaliação.';
-    }
-    
-    if (typeof state.score !== 'number' || state.score < 0) {
-        return 'Pontuação inválida.';
-    }
-    
-    if (state.score > state.currentAssessment.questions.length) {
-        return 'Pontuação superior ao número de questões.';
-    }
-    
-    return null; // Sem erros
-}
-
-/**
- * NOVA FUNÇÃO: Prepara o log de respostas para envio ao banco
- */
-function prepareAnswerLogForSubmission(answerLog) {
-    return answerLog.map((answer, index) => ({
-        questionId: answer.questionId || `unknown-${index}`,
-        isCorrect: Boolean(answer.isCorrect),
-        duration: Math.max(1, Math.min(answer.duration || 30, 3600)), // Entre 1s e 1h
-        questionIndex: typeof answer.questionIndex === 'number' ? answer.questionIndex : index
-    }));
-}
-
-/**
- * NOVA FUNÇÃO: Exibe o resultado do salvamento
- */
-function displaySaveResult(saveResult) {
-    if (saveResult.error === 'duplicate' || saveResult.error === 'duplicate_local') {
-        dom.results.saveStatus.textContent = "ATENÇÃO: Este aluno já concluiu a avaliação. Este resultado não foi salvo.";
-        dom.results.saveStatus.style.color = 'red';
-    } else if (saveResult.success && saveResult.synced) {
-        dom.results.saveStatus.textContent = "Resultado salvo e sincronizado com sucesso!";
-        dom.results.saveStatus.style.color = 'green';
-    } else if (saveResult.success) {
-        dom.results.saveStatus.textContent = "Resultado salvo localmente. Será sincronizado quando houver internet.";
-        dom.results.saveStatus.style.color = '#d97706'; // amber-600
-    } else {
-        dom.results.saveStatus.textContent = "Erro ao salvar o resultado. Entre em contato com o professor.";
-        dom.results.saveStatus.style.color = 'red';
-    }
-}
-
-/**
- * NOVA FUNÇÃO: Exibe a pontuação final
+ * Exibe a pontuação final na tela de resultados.
  */
 function displayFinalScore(score, totalQuestions) {
-    // CORREÇÃO: Cálculo seguro da nota
-    const validScore = Math.max(0, Math.min(score, totalQuestions));
-    const finalScore = totalQuestions > 0 ? (validScore * 10 / totalQuestions) : 0;
-    
-    dom.results.score.textContent = `${validScore} / ${totalQuestions}`;
+    const finalScore = totalQuestions > 0 ? (score * 10 / totalQuestions) : 0;
+    dom.results.score.textContent = `${score} / ${totalQuestions}`;
     dom.results.decimalScore.textContent = finalScore.toFixed(1).replace('.', ',');
 }
 
 /**
- * CORRIGIDA: Configura o event listener para o botão "Próxima Pergunta".
+ * Exibe o status do salvamento (sincronizado, offline, erro).
+ */
+function displaySaveResult(result) {
+    if (result.error === 'duplicate' || result.error === 'duplicate_local') {
+        dom.results.saveStatus.textContent = "Atenção: Este resultado já foi salvo anteriormente.";
+        dom.results.saveStatus.style.color = 'orange';
+    } else if (result.success && result.synced) {
+        dom.results.saveStatus.textContent = "Resultado salvo e sincronizado com sucesso!";
+        dom.results.saveStatus.style.color = 'green';
+    } else if (result.success && !result.synced) {
+        dom.results.saveStatus.textContent = "Resultado salvo localmente. Será sincronizado depois.";
+        dom.results.saveStatus.style.color = '#d97706'; // amber-600
+    } else {
+        dom.results.saveStatus.textContent = `Erro ao salvar: ${result.details || 'Tente novamente.'}`;
+        dom.results.saveStatus.style.color = 'red';
+    }
+}
+
+/**
+ * Mostra uma mensagem de erro na tela de login.
+ */
+function showErrorOnLogin(message) {
+    dom.login.errorMessage.textContent = message;
+    dom.login.errorMessage.classList.remove('hidden');
+    showScreen('login');
+}
+
+/**
+ * Inicializa os listeners de eventos para a tela do quiz.
  */
 export function initializeQuizScreen() {
-    // CORREÇÃO: Remove listener anterior para evitar duplicatas
-    const newNextBtn = dom.quiz.nextBtn.cloneNode(true);
-    dom.quiz.nextBtn.parentNode.replaceChild(newNextBtn, dom.quiz.nextBtn);
-    dom.quiz.nextBtn = newNextBtn;
-    
+    // Garante que o listener não seja duplicado
+    dom.quiz.nextBtn.replaceWith(dom.quiz.nextBtn.cloneNode(true));
+    dom.quiz.nextBtn = document.getElementById('next-btn'); // Reatribui a referência do DOM
     dom.quiz.nextBtn.addEventListener('click', nextQuestion);
 }

@@ -1,243 +1,32 @@
-// src/database.js - VERSÃO COMPLETA CORRIGIDA
+// src/database.js - VERSÃO CORRIGIDA E COMPLETA
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
-
-let supabaseClient;
-const { createClient } = supabase;
-
-// Debug detalhado da inicialização
-console.log('=== INICIALIZANDO SUPABASE ===');
-console.log('URL fornecida:', SUPABASE_URL);
-console.log('Key fornecida:', SUPABASE_ANON_KEY ? `${SUPABASE_ANON_KEY.substring(0, 20)}...` : 'NÃO FORNECIDA');
-
-if (SUPABASE_URL && SUPABASE_ANON_KEY && 
-    SUPABASE_URL !== 'https://seu-projeto.supabase.co' && 
-    SUPABASE_ANON_KEY !== 'sua-chave-anonima-aqui') {
-    try {
-        supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log('✅ Supabase inicializado com sucesso');
-        
-        // TESTE de conexão
-        supabaseClient.from('students').select('count', { count: 'exact', head: true })
-            .then(({ count, error }) => {
-                if (error) {
-                    console.error('❌ Erro na conexão de teste:', error);
-                } else {
-                    console.log(`✅ Conexão testada - ${count} estudantes encontrados`);
-                }
-            });
-            
-    } catch (e) {
-        console.error("❌ Erro ao inicializar Supabase:", e);
-        supabaseClient = null;
-    }
-} else {
-    console.warn("⚠️ Credenciais do Supabase não configuradas - usando modo offline");
-    supabaseClient = null;
-}
+import { getSupabaseClient, isSupabaseAvailable } from './services/supabaseClient.js';
+import { mockDataService } from './services/mockDataService.js';
+import { logService } from './services/logService.js';
+import { validators } from './utils/validators.js';
 
 // ===================================================================================
-// FUNÇÕES DE BUSCA DE DADOS ESTRUTURAIS
+// FUNÇÕES DE BUSCA DE DADOS ESTRUTURAIS (DELEGADAS)
 // ===================================================================================
 
-/**
- * Busca as turmas de um determinado ano e período letivo.
- */
-export async function getClassesByGrade(grade, periodName = "3º Bimestre", year = 2025) {
-    console.log(`=== BUSCANDO TURMAS ===`);
-    console.log(`Grade: ${grade}, Período: ${periodName}, Ano: ${year}`);
-    console.log(`Supabase cliente disponível:`, !!supabaseClient);
-    
-    if (!supabaseClient) {
-        console.warn('⚠️ Supabase não disponível - usando dados mock para turmas');
-        const mockData = createMockClasses(grade);
-        console.log('Mock classes criadas:', mockData);
-        return mockData;
-    }
-    
-    try {
-        console.log('🔍 Buscando período acadêmico...');
-        const { data: periodData, error: periodError } = await supabaseClient
-            .from('academic_periods')
-            .select('id')
-            .eq('year', year)
-            .eq('name', periodName)
-            .single();
+export { getClassesByGrade } from './services/classService.js';
+export { getStudentsByClass } from './services/studentService.js';
 
-        if (periodError) {
-            console.warn('⚠️ Período acadêmico não encontrado:', periodError);
-            console.log('Tentando buscar TODOS os períodos para debug...');
-            
-            const { data: allPeriods, error: allPeriodsError } = await supabaseClient
-                .from('academic_periods')
-                .select('*');
-            
-            if (allPeriodsError) {
-                console.error('❌ Erro ao buscar períodos:', allPeriodsError);
-            } else {
-                console.log('📅 Períodos disponíveis no banco:', allPeriods);
-            }
-            
-            return createMockClasses(grade);
-        }
-
-        console.log('✅ Período encontrado:', periodData);
-
-        console.log('🔍 Buscando turmas...');
-        const { data, error } = await supabaseClient
-            .from('classes')
-            .select('id, name')
-            .eq('grade', grade)
-            .eq('academic_period_id', periodData.id);
-
-        if (error) {
-            console.error('❌ Erro ao buscar turmas:', error);
-            throw error;
-        }
-        
-        console.log(`✅ Turmas encontradas no Supabase:`, data);
-        
-        // Garante que sempre retorna um array
-        return data && data.length > 0 ? data : createMockClasses(grade);
-        
-    } catch (error) {
-        console.error("❌ Erro geral ao buscar turmas:", error.message);
-        return createMockClasses(grade);
-    }
-}
-
-/**
- * Cria turmas mock para funcionamento offline
- */
-function createMockClasses(grade) {
-    return [
-        { id: `mock-class-${grade}-A`, name: 'A' },
-        { id: `mock-class-${grade}-B`, name: 'B' }
-    ];
-}
-
-/**
- * Busca os alunos matriculados numa turma específica, ordenados por nome.
- * @param {string} classId - O ID da turma.
- * @returns {Promise<Array>} - Lista de objetos de aluno.
- */
-export async function getStudentsByClass(classId) {
-    if (!supabaseClient) {
-        console.warn('Modo offline: retornando alunos mock');
-        return createMockStudents(classId);
-    }
-    
-    try {
-        const { data, error } = await supabaseClient
-            .from('class_enrollments')
-            .select(`
-                students (
-                    id, 
-                    full_name, 
-                    adaptation_details
-                )
-            `)
-            .eq('class_id', classId)
-            .order('full_name', { foreignTable: 'students', ascending: true });
-
-        if (error) throw error;
-        
-        if (!data || data.length === 0) {
-            console.warn('Nenhum aluno encontrado para a turma, usando dados mock');
-            return createMockStudents(classId);
-        }
-
-        const validStudents = data
-            .map(enrollment => enrollment.students)
-            .filter(student => student && student.id && student.full_name);
-
-        return validStudents.length > 0 ? validStudents : createMockStudents(classId);
-        
-    } catch (error) {
-        console.error("Erro ao buscar alunos da turma:", error.message);
-        return createMockStudents(classId);
-    }
-}
-
-/**
- * Cria alunos mock baseados na estrutura real do banco
- */
-function createMockStudents(classId) {
-    const baseStudents = [
-        { 
-            id: `mock-student-1-${classId}`, 
-            full_name: 'Ana Silva', 
-            adaptation_details: null 
-        },
-        { 
-            id: `mock-student-2-${classId}`, 
-            full_name: 'João Santos', 
-            adaptation_details: {
-                "diagnosis": ["TDAH", "Transtorno de aprendizagem"],
-                "suggestions": ["Textos curtos", "Poucas opções de alternativas"],
-                "difficulties": ["Atenção", "Concentração"]
-            }
-        },
-        { 
-            id: `mock-student-3-${classId}`, 
-            full_name: 'Maria Costa', 
-            adaptation_details: {
-                "diagnosis": ["TEA", "Deficiência Motora"],
-                "suggestions": ["Atividades para coordenação motora", "Pareamento"],
-                "difficulties": ["Coordenação motora fina"]
-            }
-        },
-        { 
-            id: `mock-student-4-${classId}`, 
-            full_name: 'Pedro Lima', 
-            adaptation_details: null 
-        },
-        { 
-            id: `mock-student-5-${classId}`, 
-            full_name: 'Sofia Oliveira', 
-            adaptation_details: {
-                "diagnosis": ["Síndrome de Down"],
-                "suggestions": ["Coordenação motora", "Relação números/quantidades"],
-                "difficulties": ["Atenção e concentração"]
-            }
-        },
-        { 
-            id: `mock-student-6-${classId}`, 
-            full_name: 'Carlos Mendes', 
-            adaptation_details: {
-                "diagnosis": ["Deficiência Intelectual"],
-                "suggestions": ["Atividades com textos curtos", "Poucas alternativas de respostas"],
-                "difficulties": ["Interpretação textual", "Cálculos matemáticos"]
-            }
-        }
-    ];
-    
-    console.log('Dados mock criados com alunos atípicos (estrutura real):', 
-                baseStudents.filter(s => s.adaptation_details).length);
-    return baseStudents;
-}
 
 // ===================================================================================
-// FUNÇÕES DE BUSCA DE DADOS DA AVALIAÇÃO
+// FUNÇÕES DE BUSCA DA AVALIAÇÃO
 // ===================================================================================
 
-/**
- * Busca os detalhes de uma avaliação e a sua lista de questões ordenada.
- * @param {number} grade - O ano da avaliação.
- * @param {string} disciplineName - O nome da disciplina.
- * @param {string} periodName - O nome do período.
- * @param {number} year - O ano letivo.
- * @returns {Promise<object|null>} - O objeto da avaliação com a lista de questões.
- */
 export async function getAssessmentData(grade, disciplineName = 'Artes', periodName = '3º Bimestre', year = 2025) {
-    if (!supabaseClient) {
-        console.warn('Modo offline: retornando avaliação mock');
-        return createMockAssessment(grade, disciplineName);
+    if (!isSupabaseAvailable()) {
+        logService.warn('Supabase indisponível. Usando avaliação mock.');
+        return mockDataService.getAssessmentData(grade, disciplineName);
     }
-    
+
+    const client = getSupabaseClient();
+
     try {
-        // 1. Busca a avaliação usando a função RPC
-        const { data: assessmentData, error: assessmentError } = await supabaseClient
+        const { data: assessment, error: rpcError } = await client
             .rpc('get_assessment_by_details', {
                 p_grade: grade,
                 p_discipline_name: disciplineName,
@@ -246,159 +35,98 @@ export async function getAssessmentData(grade, disciplineName = 'Artes', periodN
             })
             .single();
 
-        if (assessmentError || !assessmentData) {
-            console.warn('Avaliação não encontrada no banco, usando dados mock:', assessmentError);
-            return createMockAssessment(grade, disciplineName);
+        if (rpcError || !assessment) {
+            logService.warn('Avaliação não encontrada via RPC, usando mock.', { grade, disciplineName, error: rpcError });
+            return mockDataService.getAssessmentData(grade, disciplineName);
         }
 
-        // 2. Busca as questões associadas
-        const { data: questionsData, error: questionsError } = await supabaseClient
-            .from('assessment_questions')
+        const { data: assessmentData, error: queryError } = await client
+            .from('assessments')
             .select(`
-                questions (
-                    id,
-                    question_text,
-                    options,
-                    grade,
-                    discipline_id
+                id,
+                title,
+                base_text,
+                assessment_questions (
+                    question_order,
+                    questions (
+                        id,
+                        question_text,
+                        options
+                    )
                 )
             `)
-            .eq('assessment_id', assessmentData.id)
-            .order('question_order');
+            .eq('id', assessment.id)
+            .single();
 
-        if (questionsError) {
-            console.warn('Erro ao buscar questões, usando mock:', questionsError);
-            return createMockAssessment(grade, disciplineName);
+        if (queryError) {
+            logService.error('Erro ao buscar detalhes da avaliação e questões.', queryError);
+            throw queryError;
         }
 
-        const validQuestions = questionsData
-            .map(q => q.questions)
-            .filter(question => question && question.id && question.question_text)
-            .map(question => processQuestionOptions(question));
+        const validQuestions = (assessmentData.assessment_questions || [])
+            .map(aq => ({ ...aq.questions, order: aq.question_order }))
+            .filter(q => q && q.id && q.question_text)
+            .sort((a, b) => a.order - b.order)
+            .map(processQuestionOptions);
 
         if (validQuestions.length === 0) {
-            console.warn('Nenhuma questão válida encontrada, usando mock');
-            return createMockAssessment(grade, disciplineName);
+            logService.warn('Nenhuma questão válida encontrada para a avaliação, usando mock.', { assessmentId: assessment.id });
+            return mockDataService.getAssessmentData(grade, disciplineName);
         }
 
         return {
             id: assessmentData.id,
             title: assessmentData.title,
-            baseText: assessmentData.base_text || 'Texto base não disponível.',
+            baseText: assessmentData.base_text || 'Texto de apoio não disponível.',
             questions: validQuestions
         };
 
     } catch (error) {
-        console.error("Erro ao buscar dados da avaliação:", error.message);
-        return createMockAssessment(grade, disciplineName);
+        logService.error('Falha crítica ao buscar dados da avaliação.', { error });
+        return mockDataService.getAssessmentData(grade, disciplineName);
     }
 }
 
-/**
- * Processa as opções das questões para garantir estrutura correta
- */
 function processQuestionOptions(question) {
     let options = [];
-    
     try {
-        if (typeof question.options === 'string') {
-            options = JSON.parse(question.options);
-        } else if (Array.isArray(question.options)) {
-            options = question.options;
-        } else {
-            console.warn('Estrutura de opções inválida para questão:', question.id);
-            options = [
-                { text: 'Opção A', isCorrect: true },
-                { text: 'Opção B', isCorrect: false }
-            ];
-        }
+        options = typeof question.options === 'string' ? JSON.parse(question.options) : (question.options || []);
+        if (!Array.isArray(options)) throw new Error('Options is not an array.');
         
         const hasCorrectOption = options.some(opt => opt.isCorrect === true);
         if (!hasCorrectOption && options.length > 0) {
             options[0].isCorrect = true;
-            console.warn('Questão sem resposta correta, marcando primeira opção:', question.id);
+            logService.warn('Questão sem resposta correta definida. Marcando a primeira como correta.', { questionId: question.id });
         }
-        
     } catch (error) {
-        console.error('Erro ao processar opções da questão:', question.id, error);
+        logService.error('Erro ao processar opções da questão. Usando fallback.', { questionId: question.id, error });
         options = [
-            { text: 'Opção A', isCorrect: true },
-            { text: 'Opção B', isCorrect: false }
+            { text: 'Opção A (Fallback)', isCorrect: true },
+            { text: 'Opção B (Fallback)', isCorrect: false },
         ];
     }
-    
     return { ...question, options };
-}
-
-/**
- * Cria avaliação mock para funcionamento offline
- */
-function createMockAssessment(grade, disciplineName) {
-    return {
-        id: `mock-assessment-${grade}-${disciplineName.toLowerCase()}`,
-        title: `Avaliação de ${disciplineName} - ${grade}º Ano`,
-        baseText: `Este é um texto base de apoio para a avaliação de ${disciplineName} do ${grade}º ano. 
-        
-        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
-        
-        Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.`,
-        questions: [
-            {
-                id: `mock-q1-${grade}`,
-                question_text: `Qual é a principal característica da arte do ${grade}º ano de ensino?`,
-                options: [
-                    { text: 'Expressão criativa e desenvolvimento técnico', isCorrect: true },
-                    { text: 'Apenas técnica sem criatividade', isCorrect: false },
-                    { text: 'Somente teoria sem prática', isCorrect: false },
-                    { text: 'Imitação sem originalidade', isCorrect: false }
-                ]
-            },
-            {
-                id: `mock-q2-${grade}`,
-                question_text: 'Como a cor influencia uma obra de arte?',
-                options: [
-                    { text: 'Não tem influência alguma', isCorrect: false },
-                    { text: 'Transmite emoções e sensações', isCorrect: true },
-                    { text: 'Serve apenas para decoração', isCorrect: false },
-                    { text: 'É sempre secundária à forma', isCorrect: false }
-                ]
-            },
-            {
-                id: `mock-q3-${grade}`,
-                question_text: 'Qual a importância do desenho na formação artística?',
-                options: [
-                    { text: 'É dispensável na arte moderna', isCorrect: false },
-                    { text: 'Desenvolve observação e coordenação motora', isCorrect: true },
-                    { text: 'Só serve para copiar outros artistas', isCorrect: false },
-                    { text: 'É útil apenas para arquitetura', isCorrect: false }
-                ]
-            }
-        ]
-    };
 }
 
 // ===================================================================================
 // FUNÇÕES DE SALVAMENTO DE RESULTADOS
 // ===================================================================================
 
-/**
- * Salva uma submissão de prova completa com validação robusta.
- * @param {object} submissionData - Dados da submissão.
- * @returns {Promise<object>} - Um objeto indicando o estado da operação.
- */
 export async function saveSubmission(submissionData) {
-    const validationResult = validateSubmissionData(submissionData);
-    if (!validationResult.isValid) {
-        console.error('Dados de submissão inválidos:', validationResult.errors);
-        return { success: false, synced: false, error: 'validation_failed', details: validationResult.errors };
+    const { isValid, errors } = validators.validateSubmission(submissionData);
+    if (!isValid) {
+        logService.error('Dados de submissão inválidos.', { errors, submissionData });
+        return { success: false, synced: false, error: 'validation_failed', details: errors.join(', ') };
     }
 
-    if (!supabaseClient) {
+    if (!isSupabaseAvailable()) {
+        logService.warn('Aplicação offline. Salvando submissão localmente.');
         return saveSubmissionOffline(submissionData);
     }
 
     try {
-        const { error } = await supabaseClient.rpc('submit_assessment', {
+        const client = getSupabaseClient();
+        const { error } = await client.rpc('submit_assessment', {
             p_student_id: submissionData.studentId,
             p_assessment_id: submissionData.assessmentId,
             p_score: submissionData.score,
@@ -409,106 +137,52 @@ export async function saveSubmission(submissionData) {
 
         if (error) {
             if (error.code === 'P0001') {
+                logService.warn('Tentativa de submissão duplicada bloqueada pelo banco.', { studentId: submissionData.studentId });
                 return { success: false, synced: false, error: 'duplicate' };
             }
             throw error;
         }
 
-        removeFromPendingResults(submissionData);
-        
+        logService.info('Submissão salva e sincronizada com sucesso.', { studentId: submissionData.studentId });
+        removeFromPendingResults(submissionData.studentId, submissionData.assessmentId);
         return { success: true, synced: true, error: null };
 
     } catch (error) {
-        console.error("Falha na sincronização:", error.message);
+        logService.error('Falha ao sincronizar com Supabase. Salvando localmente.', { error });
         return saveSubmissionOffline(submissionData);
     }
 }
 
-/**
- * Validação robusta dos dados de submissão
- */
-function validateSubmissionData(data) {
-    const errors = [];
-    
-    if (!data.studentId || typeof data.studentId !== 'string') {
-        errors.push('studentId inválido');
-    }
-    
-    if (!data.assessmentId || typeof data.assessmentId !== 'string') {
-        errors.push('assessmentId inválido');
-    }
-    
-    if (typeof data.score !== 'number' || data.score < 0) {
-        errors.push('score inválido');
-    }
-    
-    if (typeof data.totalQuestions !== 'number' || data.totalQuestions <= 0) {
-        errors.push('totalQuestions inválido');
-    }
-    
-    if (data.score > data.totalQuestions) {
-        errors.push('score não pode ser maior que totalQuestions');
-    }
-    
-    if (typeof data.totalDuration !== 'number' || data.totalDuration < 0) {
-        errors.push('totalDuration inválido');
-    }
-    
-    if (!Array.isArray(data.answerLog)) {
-        errors.push('answerLog deve ser um array');
-    }
-    
-    return {
-        isValid: errors.length === 0,
-        errors
-    };
-}
-
-/**
- * Salvamento offline melhorado
- */
 function saveSubmissionOffline(submissionData) {
     try {
         const localResults = JSON.parse(localStorage.getItem('pending_results') || '[]');
-        
-        const isDuplicate = localResults.some(result => 
-            result.studentId === submissionData.studentId && 
-            result.assessmentId === submissionData.assessmentId
-        );
-        
+        const isDuplicate = localResults.some(r => r.studentId === submissionData.studentId && r.assessmentId === submissionData.assessmentId);
+
         if (isDuplicate) {
+            logService.warn('Submissão duplicada já existe localmente.', { studentId: submissionData.studentId });
             return { success: false, synced: false, error: 'duplicate_local' };
         }
-        
-        const dataWithTimestamp = {
-            ...submissionData,
-            localTimestamp: Date.now()
-        };
-        
+
+        const dataWithTimestamp = { ...submissionData, localTimestamp: new Date().toISOString() };
         localResults.push(dataWithTimestamp);
         localStorage.setItem('pending_results', JSON.stringify(localResults));
-        
+
+        logService.info('Submissão salva localmente.', { studentId: submissionData.studentId });
         return { success: true, synced: false, error: 'offline' };
-        
+
     } catch (error) {
-        console.error('Erro ao salvar offline:', error);
+        logService.critical('Falha crítica ao salvar no localStorage.', { error });
         return { success: false, synced: false, error: 'storage_failed' };
     }
 }
 
-/**
- * Remove submissão dos dados pendentes
- */
-function removeFromPendingResults(submissionData) {
+function removeFromPendingResults(studentId, assessmentId) {
     try {
-        const localResults = JSON.parse(localStorage.getItem('pending_results') || '[]');
-        const filtered = localResults.filter(result => 
-            !(result.studentId === submissionData.studentId && 
-              result.assessmentId === submissionData.assessmentId)
-        );
-        localStorage.setItem('pending_results', JSON.stringify(filtered));
+        let localResults = JSON.parse(localStorage.getItem('pending_results') || '[]');
+        localResults = localResults.filter(r => !(r.studentId === studentId && r.assessmentId === assessmentId));
+        localStorage.setItem('pending_results', JSON.stringify(localResults));
     } catch (error) {
-        console.error('Erro ao limpar dados pendentes:', error);
+        logService.error('Erro ao limpar submissão pendente do localStorage.', { error });
     }
 }
 
@@ -516,312 +190,123 @@ function removeFromPendingResults(submissionData) {
 // FUNÇÕES PARA O PAINEL DO PROFESSOR
 // ===================================================================================
 
-/**
- * Busca todos os resultados com melhor tratamento de erros.
- * @returns {Promise<Array>} - Lista de todas as submissões com detalhes.
- */
 export async function getAllSubmissionsForDashboard() {
-    if (!supabaseClient) {
-        console.warn('Modo offline: retornando submissões locais');
-        return getLocalSubmissions();
+    const onlineSubmissions = await fetchOnlineSubmissions();
+    const localSubmissions = getLocalSubmissionsForDashboard();
+    const allSubmissionsMap = new Map();
+
+    onlineSubmissions.forEach(sub => allSubmissionsMap.set(`${sub.student_id}-${sub.assessment_id}`, sub));
+    localSubmissions.forEach(sub => {
+        const key = `${sub.student_id}-${sub.assessment_id}`;
+        if (!allSubmissionsMap.has(key)) {
+            allSubmissionsMap.set(key, sub);
+        }
+    });
+
+    const combined = Array.from(allSubmissionsMap.values());
+    return combined.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+}
+
+async function fetchOnlineSubmissions() {
+    if (!isSupabaseAvailable()) {
+        logService.warn('Supabase indisponível. Não foi possível buscar submissões online.');
+        return [];
     }
-    
     try {
-        const { data, error } = await supabaseClient
+        const client = getSupabaseClient();
+        const { data, error } = await client
             .from('submissions')
             .select(`
-                id,
-                student_id,
-                assessment_id,
-                score,
-                total_questions,
-                total_duration_seconds,
-                submitted_at,
-                students (
-                    id,
-                    full_name
-                ),
-                assessments (
-                    id,
-                    title
-                )
+                id, student_id, assessment_id, score, total_questions, total_duration_seconds, submitted_at,
+                students!inner(id, full_name, adaptation_details, class_enrollments!inner(classes!inner(id, name, grade))),
+                assessments(id, title)
             `)
             .order('submitted_at', { ascending: false });
 
         if (error) throw error;
-        
-        const validSubmissions = (data || []).filter(submission => 
-            submission.students && 
-            submission.assessments && 
-            submission.students.full_name &&
-            submission.assessments.title
-        );
-        
-        return validSubmissions;
-        
+
+        return (data || []).map(sub => {
+            const studentClass = sub.students?.class_enrollments[0]?.classes;
+            return {
+                ...sub,
+                student_class: studentClass?.name || 'N/A',
+                student_grade: studentClass?.grade || 0,
+            };
+        });
+
     } catch (error) {
-        console.error("Erro ao buscar submissões:", error.message);
-        return getLocalSubmissions();
+        logService.error("Erro ao buscar submissões online.", { error });
+        return [];
     }
 }
 
-/**
- * Busca submissões locais para modo offline
- */
-function getLocalSubmissions() {
+function getLocalSubmissionsForDashboard() {
     try {
-        const localResults = JSON.parse(localStorage.getItem('pending_results') || '[]');
-        
-        return localResults.map((result, index) => ({
-            id: `local-${index}`,
+        return (JSON.parse(localStorage.getItem('pending_results') || '[]')).map((result, index) => ({
+            id: `local-${index}-${result.studentId}`,
             student_id: result.studentId,
             assessment_id: result.assessmentId,
             score: result.score,
             total_questions: result.totalQuestions,
             total_duration_seconds: result.totalDuration,
-            submitted_at: new Date(result.localTimestamp || Date.now()).toISOString(),
-            students: {
-                id: result.studentId,
-                full_name: `Aluno Local ${index + 1}`
-            },
-            assessments: {
-                id: result.assessmentId,
-                title: 'Avaliação Local'
-            }
+            submitted_at: result.localTimestamp,
+            is_local: true,
+            students: { id: result.studentId, full_name: result.studentName || `Aluno Local`, adaptation_details: result.adaptationDetails || null },
+            assessments: { id: result.assessmentId, title: result.assessmentTitle || 'Avaliação Local' },
+            student_class: result.className || 'N/A',
+            student_grade: result.grade || 0
         }));
     } catch (error) {
-        console.error('Erro ao carregar submissões locais:', error);
+        logService.error('Erro ao carregar submissões locais.', { error });
         return [];
     }
 }
 
-/**
- * Busca os detalhes das respostas de uma submissão específica.
- * @param {string} submissionId - O ID da submissão.
- * @returns {Promise<Array>} - Lista de respostas detalhadas.
- */
 export async function getSubmissionAnswers(submissionId) {
-    if (!supabaseClient || submissionId.startsWith('local-')) {
-        console.warn('Modo offline ou submissão local: retornando respostas mock');
-        return createMockAnswers(submissionId);
+    if (!isSupabaseAvailable() || String(submissionId).startsWith('local-')) {
+        logService.warn('Submissão local ou offline, não é possível buscar respostas detalhadas.');
+        return [];
     }
-    
     try {
-        const { data, error } = await supabaseClient
-            .from('submission_answers')
-            .select(`
-                id,
-                question_id,
-                is_correct,
-                duration_seconds,
-                questions (
-                    question_text
-                )
-            `)
-            .eq('submission_id', submissionId);
-            
+        const client = getSupabaseClient();
+        const { data, error } = await client.from('submission_answers').select(`*, questions(question_text)`).eq('submission_id', submissionId);
         if (error) throw error;
-        
         return data || [];
-        
     } catch (error) {
-        console.error("Erro ao buscar respostas da submissão:", error.message);
-        return createMockAnswers(submissionId);
+        logService.error("Erro ao buscar respostas da submissão.", { submissionId, error });
+        return [];
     }
-}
-
-/**
- * Cria respostas mock para submissões locais
- */
-function createMockAnswers(submissionId) {
-    return [
-        {
-            id: `mock-answer-1-${submissionId}`,
-            question_id: 'mock-question-1',
-            is_correct: true,
-            duration_seconds: 30,
-            questions: {
-                question_text: 'Questão exemplo 1'
-            }
-        },
-        {
-            id: `mock-answer-2-${submissionId}`,
-            question_id: 'mock-question-2',
-            is_correct: false,
-            duration_seconds: 45,
-            questions: {
-                question_text: 'Questão exemplo 2'
-            }
-        }
-    ];
 }
 
 // ===================================================================================
 // FUNÇÕES PARA GERAÇÃO DE ARQUIVO OFFLINE
 // ===================================================================================
 
-/**
- * Busca todos os alunos de todas as turmas
- * Função necessária para o gerador offline
- */
-export async function getAllStudentsFromAllClasses() {
-    const allStudents = [];
-    const grades = [6, 7, 8, 9];
-    
-    for (const grade of grades) {
-        try {
-            const classes = await getClassesByGrade(grade);
-            
-            for (const cls of classes) {
-                const students = await getStudentsByClass(cls.id);
-                
-                students.forEach(student => {
-                    allStudents.push({
-                        ...student,
-                        grade: grade,
-                        classId: cls.id,
-                        className: cls.name
-                    });
-                });
-            }
-        } catch (error) {
-            console.error(`Erro ao buscar alunos do ${grade}º ano:`, error);
-        }
+export async function getDataForOfflineFile() {
+    if (!isSupabaseAvailable()) {
+        alert("É necessário estar online para gerar o arquivo offline.");
+        throw new Error("Offline mode: Cannot fetch data for offline file.");
     }
-    
-    console.log(`Total de alunos coletados: ${allStudents.length}`);
-    return allStudents;
-}
+    logService.info('Iniciando coleta de dados para arquivo offline...');
+    const client = getSupabaseClient();
+    const [students, classes, enrollments, assessments] = await Promise.all([
+        client.from('students').select('*'),
+        client.from('classes').select('*'),
+        client.from('class_enrollments').select('*'),
+        client.from('assessments').select(`*, assessment_questions(question_order, questions(*))`)
+    ]);
 
-/**
- * Busca todas as turmas de todos os anos
- * Função necessária para o gerador offline
- */
-export async function getAllClassesFromAllGrades() {
-    const allClasses = [];
-    const grades = [6, 7, 8, 9];
-    
-    for (const grade of grades) {
-        try {
-            const classes = await getClassesByGrade(grade);
-            
-            classes.forEach(cls => {
-                allClasses.push({
-                    ...cls,
-                    grade: grade
-                });
-            });
-        } catch (error) {
-            console.error(`Erro ao buscar turmas do ${grade}º ano:`, error);
-        }
+    const errors = [students.error, classes.error, enrollments.error, assessments.error].filter(Boolean);
+    if (errors.length > 0) {
+        logService.critical('Erro ao buscar dados para o arquivo offline.', { errors });
+        throw new Error("Falha ao buscar todos os dados do Supabase.");
     }
-    
-    console.log(`Total de turmas coletadas: ${allClasses.length}`);
-    return allClasses;
-}
 
-/**
- * Busca todas as avaliações de todos os anos
- * Função necessária para o gerador offline
- */
-export async function getAllAssessmentsData() {
-    const allAssessments = [];
-    const grades = [6, 7, 8, 9];
-    const disciplines = ['Artes']; // Adicione mais disciplinas conforme necessário no seu banco
-    
-    for (const grade of grades) {
-        for (const discipline of disciplines) {
-            try {
-                const assessment = await getAssessmentData(grade, discipline);
-                
-                if (assessment) {
-                    allAssessments.push({
-                        ...assessment,
-                        grade: grade,
-                        discipline: discipline
-                    });
-                }
-            } catch (error) {
-                console.error(`Erro ao buscar avaliação ${discipline} - ${grade}º ano:`, error);
-            }
-        }
-    }
-    
-    console.log(`Total de avaliações coletadas: ${allAssessments.length}`);
-    return allAssessments;
-}
-
-// ===================================================================================
-// FUNÇÕES DE SINCRONIZAÇÃO
-// ===================================================================================
-
-/**
- * Sincroniza todos os dados pendentes
- */
-export async function syncPendingSubmissions() {
-    if (!supabaseClient) {
-        return { success: false, error: 'offline_mode' };
-    }
-    
-    try {
-        const localResults = JSON.parse(localStorage.getItem('pending_results') || '[]');
-        
-        if (localResults.length === 0) {
-            return { success: true, synced: 0, errors: [] };
-        }
-        
-        let syncedCount = 0;
-        const errors = [];
-        
-        for (const result of localResults) {
-            try {
-                const syncResult = await saveSubmission(result);
-                if (syncResult.success && syncResult.synced) {
-                    syncedCount++;
-                }
-            } catch (error) {
-                errors.push({
-                    studentId: result.studentId,
-                    error: error.message
-                });
-            }
-        }
-        
-        return {
-            success: true,
-            synced: syncedCount,
-            total: localResults.length,
-            errors
-        };
-        
-    } catch (error) {
-        console.error('Erro na sincronização:', error);
-        return { success: false, error: error.message };
-    }
-}
-
-/**
- * Limpa dados locais antigos
- */
-export function cleanOldLocalData(maxAge = 7 * 24 * 60 * 60 * 1000) { // 7 dias
-    try {
-        const localResults = JSON.parse(localStorage.getItem('pending_results') || '[]');
-        const now = Date.now();
-        
-        const filtered = localResults.filter(result => {
-            const age = now - (result.localTimestamp || 0);
-            return age < maxAge;
-        });
-        
-        localStorage.setItem('pending_results', JSON.stringify(filtered));
-        
-        return {
-            removed: localResults.length - filtered.length,
-            remaining: filtered.length
-        };
-        
-    } catch (error) {
-        console.error('Erro ao limpar dados antigos:', error);
-        return { removed: 0, remaining: 0 };
-    }
+    logService.info('Coleta de dados para arquivo offline concluída.');
+    return {
+        students: students.data,
+        classes: classes.data,
+        enrollments: enrollments.data,
+        assessments: assessments.data
+    };
 }

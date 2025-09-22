@@ -1,20 +1,41 @@
-// src/teacher/offlineGenerator.js - Gerador de arquivo HTML offline
-import { 
-    getAllStudentsFromAllClasses,
-    getAllClassesFromAllGrades,
-    getAllAssessmentsData,
-    getAllSubmissionsForDashboard 
-} from '../database.js';
+// src/teacher/offlineGenerator.js - VERSÃO CORRIGIDA E ROBUSTA
+
+import { getDataForOfflineFile } from '../database.js';
 import { logService } from '../services/logService.js';
 
+// Ordem correta de "compilação" dos scripts para o modo offline.
+// Arquivos sem dependências vêm primeiro.
+const SCRIPT_LOAD_ORDER = [
+    'src/services/logService.js',
+    'src/state.js',
+    'src/navigation.js',
+    'src/utils/validators.js',
+    'src/services/supabaseClient.js', // Precisa ser definido antes do database
+    'src/services/mockDataService.js',
+    'src/database.js',
+    'src/services/cacheService.js',
+    'src/services/classService.js',
+    'src/services/studentService.js',
+    'src/ui.js',
+    'src/quiz.js',
+    'src/adaptation.js',
+    'src/login.js',
+    'src/teacher/teacherAuth.js',
+    'src/teacher/dataSync.js',
+    'src/teacher/dashboard/dashboardData.js',
+    'src/teacher/dashboard/dashboardCharts.js',
+    'src/teacher/dashboard/dashboardTable.js',
+    'src/teacher/dashboard/dashboardFilters.js',
+    'src/teacher/dashboard/index.js',
+    'src/teacher/index.js',
+    'src/utils/errorHandler.js',
+    'src/main.js' // Main.js por último, pois ele inicializa tudo
+];
+
 export async function generateOfflineFile(statusElement, buttonElement) {
-    const confirmMsg = 
-        "Esta operação irá gerar um arquivo HTML completo para uso offline.\n\n" +
-        "O arquivo incluirá TODOS os dados atuais do Supabase.\n\n" +
-        "Deseja continuar?";
-    
-    if (!confirm(confirmMsg)) return;
-    
+    if (!confirm("Esta operação irá gerar um arquivo HTML completo para uso offline. Deseja continuar?")) {
+        return;
+    }
     const generator = new OfflineFileGenerator(statusElement, buttonElement);
     await generator.generate();
 }
@@ -27,171 +48,125 @@ class OfflineFileGenerator {
 
     async generate() {
         this.buttonElement.disabled = true;
-        
+        this.updateStatus('Iniciando...', '#64748b');
+
         try {
-            // Coleta dados
-            const data = await this.collectAllData();
-            
-            // Carrega templates
+            // 1. Buscar todos os dados do banco
+            this.updateStatus('Coletando dados do servidor...');
+            const serverData = await getDataForOfflineFile();
+
+            // 2. Buscar todos os templates (HTML, CSS, JS)
+            this.updateStatus('Carregando arquivos da aplicação...');
             const templates = await this.loadTemplates();
-            
-            // Gera HTML final
-            const finalHTML = this.buildOfflineHTML(templates, data);
-            
-            // Faz download
+
+            // 3. Juntar tudo em um único arquivo HTML
+            this.updateStatus('Compilando arquivo final...');
+            const finalHTML = this.buildFinalHTML(templates, serverData);
+
+            // 4. Iniciar o download
             this.downloadFile(finalHTML);
-            
-            this.showSuccess(data);
-            
+            this.showSuccess(serverData);
+
         } catch (error) {
             this.showError(error);
+            logService.critical('Falha ao gerar arquivo offline.', { error });
         } finally {
             this.buttonElement.disabled = false;
-            this.clearStatus(5000);
+            setTimeout(() => this.clearStatus(), 7000);
         }
     }
 
-    async collectAllData() {
-        this.updateStatus("Coletando dados dos alunos...");
-        const students = await getAllStudentsFromAllClasses();
-        
-        this.updateStatus("Coletando dados das turmas...");
-        const classes = await getAllClassesFromAllGrades();
-        
-        this.updateStatus("Coletando dados das avaliações...");
-        const assessments = await getAllAssessmentsData();
-        
-        this.updateStatus("Coletando submissões existentes...");
-        const submissions = await getAllSubmissionsForDashboard();
-        
-        logService.info('Dados coletados para arquivo offline', {
-            students: students.length,
-            classes: classes.length,
-            assessments: assessments.length,
-            submissions: submissions.length
-        });
-        
-        return { students, classes, assessments, submissions };
-    }
-
     async loadTemplates() {
-        const htmlResponse = await fetch('./index.html');
-        if (!htmlResponse.ok) throw new Error('Erro ao carregar template HTML');
-        const html = await htmlResponse.text();
+        // Carrega o conteúdo de todos os arquivos JS em paralelo
+        const scriptPromises = SCRIPT_LOAD_ORDER.map(path =>
+            fetch(`/${path}`)
+            .then(res => {
+                if (!res.ok) throw new Error(`Falha ao carregar ${path}`);
+                return res.text();
+            })
+        );
 
-        const cssResponse = await fetch('./styles/main.css');
-        if (!cssResponse.ok) throw new Error('Erro ao carregar CSS');
-        const css = await cssResponse.text();
+        // Carrega HTML e CSS
+        const htmlPromise = fetch('/index.html').then(res => res.text());
+        const cssPromise = fetch('/styles/main.css').then(res => res.text());
 
-        return { html, css };
+        const [html, css, ...scripts] = await Promise.all([htmlPromise, cssPromise, ...scriptPromises]);
+
+        // Mapeia os scripts de volta para seus nomes de arquivo
+        const scriptContents = SCRIPT_LOAD_ORDER.reduce((acc, path, index) => {
+            acc[path] = scripts[index];
+            return acc;
+        }, {});
+
+        return { html, css, scripts: scriptContents };
     }
 
-    buildOfflineHTML(templates, data) {
-        let html = templates.html;
-        
-        // Injeta CSS inline
-        html = html.replace(
-            '<link rel="stylesheet" href="styles/main.css">',
-            `<style>${templates.css}</style>`
-        );
-        
-        // Injeta JavaScript com dados
-        const offlineJS = this.generateOfflineJavaScript(data);
-        html = html.replace(
-            '<script type="module" src="src/main.js"></script>',
-            `<script>${offlineJS}</script>`
-        );
-        
-        // Remove elementos desnecessários
-        html = this.removeTeacherElements(html);
-        
-        return html;
-    }
+    buildFinalHTML(templates, serverData) {
+        // Remove todos os "import" e "export" do código JS
+        let combinedJs = SCRIPT_LOAD_ORDER.map(path => {
+            const content = templates.scripts[path];
+            return content
+                .replace(/^import .* from '.*';/gm, '') // Remove imports
+                .replace(/^export /gm, ''); // Remove exports
+        }).join('\n\n// --- Fim do Arquivo --- \n\n');
 
-    generateOfflineJavaScript(data) {
-        return `
-// Sistema Offline Gerado em ${new Date().toISOString()}
-const OFFLINE_DATA = ${JSON.stringify(data, null, 2)};
-console.log('Sistema offline carregado:', {
-    alunos: OFFLINE_DATA.students.length,
-    turmas: OFFLINE_DATA.classes.length,
-    avaliacoes: OFFLINE_DATA.assessments.length
+        // Cria o script que será injetado no HTML
+        const injectedJS = `
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DADOS EMBUTIDOS DO SERVIDOR ---
+    const OFFLINE_DATA = ${JSON.stringify(serverData)};
+    window.IS_OFFLINE_MODE = true;
+    console.log('--- MODO OFFLINE ATIVADO ---', {
+        alunos: OFFLINE_DATA.students.length,
+        avaliacoes: OFFLINE_DATA.assessments.length
+    });
+
+    // --- CÓDIGO COMPILADO DA APLICAÇÃO ---
+    try {
+        ${combinedJs}
+    } catch (e) {
+        console.error('Erro ao executar o script offline compilado:', e);
+        document.body.innerHTML = '<h1>Erro crítico ao carregar a aplicação offline.</h1>';
+    }
 });
-
-// Código mínimo do sistema offline
-${this.getMinimalOfflineCode()}
         `;
-    }
 
-    getMinimalOfflineCode() {
-        // Retorna apenas o código essencial para funcionamento offline
-        return `
-// Implementação mínima para funcionamento offline
-(function() {
-    // Código do sistema offline aqui
-    console.log('Sistema offline ativo');
-})();
-        `;
-    }
+        let html = templates.html;
 
-    removeTeacherElements(html) {
-        // Remove elementos relacionados ao professor
-        const patterns = [
-            /<div id="teacher-dashboard"[^>]*>[\s\S]*?(?=<div id="[^"]*"|$)/g,
-            /<div id="teacher-area-screen"[^>]*>[\s\S]*?(?=<div id="[^"]*"|$)/g,
-            /<a[^>]*id="teacher-login-link"[^>]*>.*?<\/a>/gs
-        ];
+        // Injeta o CSS inline
+        html = html.replace('<link rel="stylesheet" href="styles/main.css">', `<style>${templates.css}</style>`);
         
-        patterns.forEach(pattern => {
-            html = html.replace(pattern, '');
+        // Substitui o script original pelo nosso script compilado e com dados
+        // Usamos um ID para encontrar o script e substituí-lo
+        html = html.replace(
+            '<script type="module" src="src/main.js" id="main-script"></script>',
+            `<script>${injectedJS}</script>`
+        );
+
+        // Removemos elementos de professor
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        ['#teacher-area-screen', '#teacher-dashboard', '#teacher-login-link'].forEach(sel => {
+            const el = doc.querySelector(sel);
+            if (el) el.remove();
         });
-        
-        return html;
+
+        return doc.documentElement.outerHTML;
     }
 
-    downloadFile(html) {
-        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
+    downloadFile(htmlContent) {
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
         const link = document.createElement('a');
-        
-        link.href = url;
-        link.download = `plataforma_offline_${this.getTimestamp()}.html`;
-        
+        link.href = URL.createObjectURL(blob);
+        link.download = `plataforma_offline_${new Date().toISOString().split('T')[0]}.html`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(link.href);
     }
-
-    getTimestamp() {
-        const now = new Date();
-        const date = now.toISOString().split('T')[0];
-        const time = now.toTimeString().split(' ')[0].replace(/:/g, '-');
-        return `${date}_${time}`;
-    }
-
-    updateStatus(message) {
-        this.statusElement.textContent = message;
-        this.statusElement.style.color = '#64748b';
-    }
-
-    showSuccess(data) {
-        const message = `Arquivo gerado! ${data.students.length} alunos, ${data.classes.length} turmas`;
-        this.statusElement.textContent = message;
-        this.statusElement.style.color = 'green';
-        logService.info('Arquivo offline gerado com sucesso');
-    }
-
-    showError(error) {
-        this.statusElement.textContent = `Erro: ${error.message}`;
-        this.statusElement.style.color = 'red';
-        logService.error('Erro ao gerar arquivo offline', error);
-    }
-
-    clearStatus(delay) {
-        setTimeout(() => {
-            this.statusElement.textContent = "";
-            this.statusElement.style.color = '';
-        }, delay);
-    }
+    
+    // Funções de feedback
+    updateStatus(message, color) { this.statusElement.textContent = message; this.statusElement.style.color = color; }
+    showSuccess(data) { this.updateStatus(`Sucesso! Arquivo gerado com ${data.students.length} alunos.`, 'green'); }
+    showError(error) { this.updateStatus(`Erro: ${error.message}`, 'red'); }
+    clearStatus() { this.updateStatus('', ''); }
 }
