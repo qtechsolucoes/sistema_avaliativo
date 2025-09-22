@@ -2,6 +2,7 @@
 
 import { getSupabaseClient, isSupabaseAvailable } from './services/supabaseClient.js';
 import { mockDataService } from './services/mockDataService.js';
+import { dataService } from './services/dataService.js';
 import { logService } from './services/logService.js';
 import { validators } from './utils/validators.js';
 
@@ -18,73 +19,7 @@ export { getStudentsByClass } from './services/studentService.js';
 // ===================================================================================
 
 export async function getAssessmentData(grade, disciplineName = 'Artes', periodName = '3º Bimestre', year = 2025) {
-    if (!isSupabaseAvailable()) {
-        logService.warn('Supabase indisponível. Usando avaliação mock.');
-        return mockDataService.getAssessmentData(grade, disciplineName);
-    }
-
-    const client = getSupabaseClient();
-
-    try {
-        const { data: assessment, error: rpcError } = await client
-            .rpc('get_assessment_by_details', {
-                p_grade: grade,
-                p_discipline_name: disciplineName,
-                p_period_name: periodName,
-                p_year: year
-            })
-            .single();
-
-        if (rpcError || !assessment) {
-            logService.warn('Avaliação não encontrada via RPC, usando mock.', { grade, disciplineName, error: rpcError });
-            return mockDataService.getAssessmentData(grade, disciplineName);
-        }
-
-        const { data: assessmentData, error: queryError } = await client
-            .from('assessments')
-            .select(`
-                id,
-                title,
-                base_text,
-                assessment_questions (
-                    question_order,
-                    questions (
-                        id,
-                        question_text,
-                        options
-                    )
-                )
-            `)
-            .eq('id', assessment.id)
-            .single();
-
-        if (queryError) {
-            logService.error('Erro ao buscar detalhes da avaliação e questões.', queryError);
-            throw queryError;
-        }
-
-        const validQuestions = (assessmentData.assessment_questions || [])
-            .map(aq => ({ ...aq.questions, order: aq.question_order }))
-            .filter(q => q && q.id && q.question_text)
-            .sort((a, b) => a.order - b.order)
-            .map(processQuestionOptions);
-
-        if (validQuestions.length === 0) {
-            logService.warn('Nenhuma questão válida encontrada para a avaliação, usando mock.', { assessmentId: assessment.id });
-            return mockDataService.getAssessmentData(grade, disciplineName);
-        }
-
-        return {
-            id: assessmentData.id,
-            title: assessmentData.title,
-            baseText: assessmentData.base_text || 'Texto de apoio não disponível.',
-            questions: validQuestions
-        };
-
-    } catch (error) {
-        logService.error('Falha crítica ao buscar dados da avaliação.', { error });
-        return mockDataService.getAssessmentData(grade, disciplineName);
-    }
+    return dataService.getAssessmentData(grade, disciplineName, periodName, year);
 }
 
 function processQuestionOptions(question) {
@@ -119,38 +54,15 @@ export async function saveSubmission(submissionData) {
         return { success: false, synced: false, error: 'validation_failed', details: errors.join(', ') };
     }
 
-    if (!isSupabaseAvailable()) {
-        logService.warn('Aplicação offline. Salvando submissão localmente.');
-        return saveSubmissionOffline(submissionData);
-    }
+    // Delega para o dataService
+    const result = await dataService.saveSubmission(submissionData);
 
-    try {
-        const client = getSupabaseClient();
-        const { error } = await client.rpc('submit_assessment', {
-            p_student_id: submissionData.studentId,
-            p_assessment_id: submissionData.assessmentId,
-            p_score: submissionData.score,
-            p_total_questions: submissionData.totalQuestions,
-            p_total_duration: submissionData.totalDuration,
-            p_answers: submissionData.answerLog
-        });
-
-        if (error) {
-            if (error.code === 'P0001') {
-                logService.warn('Tentativa de submissão duplicada bloqueada pelo banco.', { studentId: submissionData.studentId });
-                return { success: false, synced: false, error: 'duplicate' };
-            }
-            throw error;
-        }
-
-        logService.info('Submissão salva e sincronizada com sucesso.', { studentId: submissionData.studentId });
+    // Remove da lista de pendentes se foi salvo com sucesso online
+    if (result.success && result.synced) {
         removeFromPendingResults(submissionData.studentId, submissionData.assessmentId);
-        return { success: true, synced: true, error: null };
-
-    } catch (error) {
-        logService.error('Falha ao sincronizar com Supabase. Salvando localmente.', { error });
-        return saveSubmissionOffline(submissionData);
     }
+
+    return result;
 }
 
 function saveSubmissionOffline(submissionData) {

@@ -115,14 +115,21 @@ async function populateStudents(classId) {
             return;
         }
 
-        // TODO: Implementar busca de alunos que já finalizaram a prova
-        // const completedStudentIds = await getCompletedStudentIds(classId);
+        // Busca alunos que já finalizaram a prova
+        const completedStudentIds = await getCompletedStudentIds(classId);
 
-        populateSelectWithOptions(dom.login.studentSelect, students, 'Aluno', 'id', 'full_name', (student) => {
-            // Lógica para desabilitar alunos que já concluíram, se necessário
-            // if (completedStudentIds.has(student.id)) {
-            //     return { disabled: true, textSuffix: ' (Concluído)' };
-            // }
+        // Debug: Mostra quais estudantes estão bloqueados
+        console.log('🔒 IDs de estudantes completados:', Array.from(completedStudentIds));
+        console.log('📋 Todos os estudantes da turma:', students.map(s => ({ id: s.id, name: s.name })));
+
+        populateSelectWithOptions(dom.login.studentSelect, students, 'Aluno', 'id', 'name', (student) => {
+            // Lógica para desabilitar alunos que já concluíram
+            const isCompleted = completedStudentIds.has(student.id);
+            console.log(`🎯 Estudante ${student.name}: ${isCompleted ? 'BLOQUEADO' : 'DISPONÍVEL'}`);
+
+            if (isCompleted) {
+                return { disabled: true, textSuffix: ' (Concluído)' };
+            }
             if (hasValidAdaptationDetails(student.adaptation_details)) {
                 return { 'data-has-adaptation': 'true', textSuffix: ' *' };
             }
@@ -281,7 +288,7 @@ export function initializeLoginScreen(onStartCallback) {
             updateState({
                 currentStudent: {
                     id: selectedStudent.id,
-                    name: selectedStudent.full_name,
+                    name: selectedStudent.name,
                     grade: grade,
                     classId: selectedClass.id,
                     className: selectedClass.name,
@@ -301,4 +308,34 @@ export function initializeLoginScreen(onStartCallback) {
     // Estado inicial
     resetSelect(dom.login.classSelect, 'turma');
     resetSelect(dom.login.studentSelect, 'aluno');
+}
+
+/**
+ * Busca IDs dos estudantes que já completaram avaliações para uma turma específica
+ * @param {string} classId - ID da turma
+ * @returns {Promise<Set<string>>} Set com IDs dos estudantes que já completaram
+ */
+async function getCompletedStudentIds(classId) {
+    try {
+        const { dataService } = await import('./services/dataService.js');
+
+        console.log('🔍 Buscando estudantes completados APENAS no Supabase (fonte única de verdade)');
+
+        // Busca submissões completadas (agora só retorna dados do Supabase)
+        const completedSubmissions = await dataService.getCompletedSubmissions(classId);
+
+        // Retorna Set com IDs únicos dos estudantes
+        const completedIds = new Set(completedSubmissions.map(submission => submission.studentId));
+
+        // Debug: Mostra IDs bloqueados
+        console.log(`🔒 Sistema centralizado: ${completedIds.size} estudantes bloqueados`);
+        console.log('📋 IDs bloqueados:', Array.from(completedIds));
+
+        return completedIds;
+
+    } catch (error) {
+        console.warn('Erro ao buscar estudantes completados:', error);
+        // Em caso de erro, retorna Set vazio (não bloqueia ninguém)
+        return new Set();
+    }
 }

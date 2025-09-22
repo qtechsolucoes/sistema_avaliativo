@@ -6,6 +6,7 @@ import { getAssessmentData, saveSubmission } from './database.js';
 import { showConfirmationModal, handleVisibilityChange } from './ui.js';
 import { routeAssessment } from './adaptation.js';
 import { logService } from './services/logService.js';
+import { HTMLSanitizer } from './utils/sanitizer.js';
 
 /**
  * Ponto de entrada principal para iniciar o fluxo da avaliação.
@@ -88,8 +89,8 @@ export function startStandardAssessment(assessmentData) {
             assessmentStartTime: Date.now()
         });
 
-        const studentInfo = `<b>Aluno(a):</b> ${state.currentStudent.name} | <b>Turma:</b> ${state.currentStudent.grade}º Ano ${state.currentStudent.className}`;
-        dom.quiz.studentInfoDisplay.innerHTML = studentInfo;
+        const studentInfo = `Aluno(a): ${state.currentStudent.name} | Turma: ${state.currentStudent.grade}º Ano ${state.currentStudent.className}`;
+        HTMLSanitizer.setSafeText(dom.quiz.studentInfoDisplay, studentInfo);
 
         loadQuestion();
         showScreen('quiz');
@@ -129,27 +130,31 @@ function loadQuestion() {
 
         updateState({ questionStartTime: Date.now() });
 
-        // Atualiza UI
-        dom.quiz.progress.textContent = `Pergunta ${state.currentQuestionIndex + 1} de ${state.currentAssessment.questions.length}`;
-        dom.quiz.question.textContent = question.question_text;
-        dom.quiz.baseTextDesktop.innerHTML = state.currentAssessment.baseText || '';
-        dom.quiz.baseTextMobile.innerHTML = state.currentAssessment.baseText || '';
-        dom.quiz.feedback.textContent = '';
+        // Atualiza UI de forma segura
+        HTMLSanitizer.setSafeText(dom.quiz.progress, `Pergunta ${state.currentQuestionIndex + 1} de ${state.currentAssessment.questions.length}`);
+        HTMLSanitizer.setSafeText(dom.quiz.question, question.question_text);
+        HTMLSanitizer.setSafeHTML(dom.quiz.baseTextDesktop, state.currentAssessment.baseText || '');
+        HTMLSanitizer.setSafeHTML(dom.quiz.baseTextMobile, state.currentAssessment.baseText || '');
+
+        // Inicializa controles de scroll do texto
+        initializeTextScrollControls();
+        HTMLSanitizer.setSafeText(dom.quiz.feedback, '');
         dom.quiz.nextBtn.classList.add('hidden');
 
-        // Renderiza as opções
+        // Renderiza as opções de forma segura
         dom.quiz.optionsContainer.innerHTML = '';
         question.options.forEach(option => {
-            const button = document.createElement('button');
-            button.textContent = option.text;
-            button.classList.add('option-btn');
+            const button = HTMLSanitizer.createSafeElement('button', option.text, 'option-btn');
             button.addEventListener('click', () => selectAnswer(button, option.isCorrect, question.id));
             dom.quiz.optionsContainer.appendChild(button);
         });
     } catch (error) {
         logService.critical('Falha ao carregar a questão.', { questionIndex: state.currentQuestionIndex, error });
-        dom.quiz.question.textContent = 'Erro ao carregar esta questão.';
-        dom.quiz.optionsContainer.innerHTML = '<p class="text-red-600">Não foi possível exibir as opções. Por favor, notifique o professor.</p>';
+        HTMLSanitizer.setSafeText(dom.quiz.question, 'Erro ao carregar esta questão.');
+
+        dom.quiz.optionsContainer.innerHTML = '';
+        const errorMsg = HTMLSanitizer.createSafeElement('p', 'Não foi possível exibir as opções. Por favor, notifique o professor.', 'text-red-600');
+        dom.quiz.optionsContainer.appendChild(errorMsg);
     }
 }
 
@@ -162,10 +167,15 @@ function loadQuestion() {
 function selectAnswer(selectedButton, isCorrect, questionId) {
     const duration = Math.round((Date.now() - state.questionStartTime) / 1000);
 
-    state.answerLog.push({
+    // Usa updateState para consistência
+    const newAnswer = {
         questionId: questionId,
         isCorrect: isCorrect,
         duration: Math.max(1, duration) // Garante que a duração seja no mínimo 1s
+    };
+
+    updateState({
+        answerLog: [...state.answerLog, newAnswer]
     });
 
     if (isCorrect) {
@@ -220,6 +230,15 @@ export async function finishAssessment() {
     document.removeEventListener('visibilitychange', handleVisibilityChange);
 
     const totalDuration = Math.round((Date.now() - state.assessmentStartTime) / 1000);
+
+    // Debug: Verificar se os IDs estão presentes
+    logService.debug('Dados para submissão:', {
+        studentId: state.currentStudent.id,
+        studentData: state.currentStudent,
+        assessmentId: state.currentAssessment.id,
+        assessmentData: state.currentAssessment
+    });
+
     const submissionData = {
         studentId: state.currentStudent.id,
         assessmentId: state.currentAssessment.id,
@@ -234,6 +253,9 @@ export async function finishAssessment() {
         classId: state.currentStudent.classId,
         className: state.currentStudent.className
     };
+
+    // Debug: Verificar dados completos da submissão
+    logService.debug('Dados completos da submissão:', submissionData);
 
     displayFinalScore(submissionData.score, submissionData.totalQuestions);
     showScreen('results');
@@ -288,9 +310,79 @@ function showErrorOnLogin(message) {
 /**
  * Inicializa os listeners de eventos para a tela do quiz.
  */
+/**
+ * Inicializa os controles de scroll do texto de apoio
+ */
+function initializeTextScrollControls() {
+    const textContainer = document.getElementById('text-scroll-container');
+    const scrollHint = document.getElementById('scroll-hint');
+
+    if (!textContainer || !scrollHint) return;
+
+    let scrollInteracted = false;
+
+    // Adiciona indicação visual quando há conteúdo para scrollar
+    function checkScrollNeed() {
+        const scrollHeight = textContainer.scrollHeight;
+        const clientHeight = textContainer.clientHeight;
+
+        if (scrollHeight > clientHeight + 50) { // +50px de margem
+            scrollHint.style.display = 'block';
+            // Auto-hide a dica após 5 segundos
+            setTimeout(() => {
+                if (!scrollInteracted) {
+                    scrollHint.style.opacity = '0.5';
+                }
+            }, 5000);
+        } else {
+            scrollHint.style.display = 'none';
+        }
+    }
+
+    // Esconde a dica após primeiro scroll
+    function handleFirstScroll() {
+        if (textContainer.scrollTop > 10 && !scrollInteracted) {
+            scrollInteracted = true;
+            scrollHint.style.display = 'none';
+        }
+    }
+
+    // Event listeners
+    textContainer.addEventListener('scroll', handleFirstScroll);
+
+    // Verifica necessidade de scroll quando o conteúdo é carregado
+    setTimeout(checkScrollNeed, 100);
+
+    // Verifica novamente se a janela redimensiona
+    window.addEventListener('resize', () => {
+        setTimeout(checkScrollNeed, 100);
+    });
+
+    // Adiciona interações do mouse/touch para melhor UX
+    textContainer.addEventListener('mouseenter', () => {
+        textContainer.style.scrollbarColor = '#3b82f6 #e2e8f0'; // Destaca scrollbar
+    });
+
+    textContainer.addEventListener('mouseleave', () => {
+        textContainer.style.scrollbarColor = '#cbd5e1 #f1f5f9'; // Volta ao normal
+    });
+}
+
 export function initializeQuizScreen() {
-    // Garante que o listener não seja duplicado
-    dom.quiz.nextBtn.replaceWith(dom.quiz.nextBtn.cloneNode(true));
-    dom.quiz.nextBtn = document.getElementById('next-btn'); // Reatribui a referência do DOM
-    dom.quiz.nextBtn.addEventListener('click', nextQuestion);
+    // Usa delegação de eventos para evitar problemas de referência DOM
+    const nextBtnId = 'next-btn';
+
+    // Remove listeners existentes se houver
+    const existingBtn = document.getElementById(nextBtnId);
+    if (existingBtn) {
+        // Cria novo botão para garantir que não há listeners órfãos
+        const newBtn = existingBtn.cloneNode(true);
+        existingBtn.parentNode.replaceChild(newBtn, existingBtn);
+
+        // Atualiza referência no DOM
+        dom.quiz.nextBtn = newBtn;
+
+        // Adiciona listener
+        newBtn.addEventListener('click', nextQuestion);
+    }
 }

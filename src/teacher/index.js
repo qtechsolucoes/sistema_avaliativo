@@ -16,6 +16,9 @@ class TeacherModule {
     initialize(resetCallback, adminPassword = "admin123") {
         if (this.isInitialized) return;
         
+        // Migra submissões antigas se necessário
+        this.migrateOldSubmissions();
+
         // Inicializa submódulos
         this.auth = initializeAuth(adminPassword);
         this.dataSync = new DataSync();
@@ -23,9 +26,25 @@ class TeacherModule {
         
         // Configura event listeners
         this.setupEventListeners(resetCallback);
-        
+
         this.isInitialized = true;
         console.log('✅ Módulo do professor inicializado');
+    }
+
+    migrateOldSubmissions() {
+        try {
+            const oldSubmissions = JSON.parse(localStorage.getItem('localSubmissions') || '[]');
+            const pendingResults = JSON.parse(localStorage.getItem('pending_results') || '[]');
+
+            // Se há submissões antigas que não estão em pending_results
+            if (oldSubmissions.length > 0 && pendingResults.length === 0) {
+                console.log('🔄 Migrando submissões antigas para exportação...');
+                localStorage.setItem('pending_results', JSON.stringify(oldSubmissions));
+                console.log(`✅ ${oldSubmissions.length} submissões migradas para exportação`);
+            }
+        } catch (error) {
+            console.warn('Erro ao migrar submissões antigas:', error);
+        }
     }
 
     setupEventListeners(resetCallback) {

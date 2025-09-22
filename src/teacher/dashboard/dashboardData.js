@@ -1,8 +1,5 @@
 // src/teacher/dashboard/dashboardData.js - Lógica de dados do dashboard
-import { 
-    getAllSubmissionsForDashboard, 
-    getSubmissionAnswers 
-} from '../../database.js';
+import { dataService } from '../../services/dataService.js';
 
 export class DashboardData {
     constructor() {
@@ -10,12 +7,19 @@ export class DashboardData {
     }
 
     async loadAllResults() {
-        const results = await getAllSubmissionsForDashboard();
-        
+        console.log('📊 Dashboard carregando dados APENAS do Supabase (fonte única)');
+        const results = await dataService.getAllSubmissionsForDashboard();
+
         if (!Array.isArray(results)) {
-            throw new Error('Dados inválidos retornados do banco');
+            throw new Error('Dados inválidos retornados do Supabase');
         }
-        
+
+        // Log para confirmar origem dos dados
+        console.log(`📈 Dashboard: ${results.length} submissões carregadas do Supabase`);
+        if (results.length > 0) {
+            console.log('✅ Todas as submissões são do Supabase:', results.every(r => r.source === 'supabase'));
+        }
+
         return results;
     }
 
@@ -24,10 +28,11 @@ export class DashboardData {
         if (this.cache.has(submissionId)) {
             return this.cache.get(submissionId);
         }
-        
-        const answers = await getSubmissionAnswers(submissionId);
+
+        console.log(`📝 Carregando respostas do Supabase para submissão: ${submissionId}`);
+        const answers = await dataService.getSubmissionAnswers(submissionId);
         this.cache.set(submissionId, answers);
-        
+
         return answers;
     }
 

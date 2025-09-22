@@ -60,5 +60,54 @@ export const mockDataService = {
             });
         }
         return questions;
+    },
+
+    saveSubmission(submissionData) {
+        // Migra submissões antigas se necessário
+        this.migrateOldSubmissions();
+
+        // Salva localmente como fallback
+        const timestamp = new Date().toISOString();
+        const submission = {
+            ...submissionData,
+            localTimestamp: timestamp,
+            isLocal: true
+        };
+
+        // Salva no localStorage
+        try {
+            // Salva tanto em 'pending_results' (para exportação) quanto em 'localSubmissions' (backup)
+            const existingSubmissions = JSON.parse(localStorage.getItem('localSubmissions') || '[]');
+            const pendingResults = JSON.parse(localStorage.getItem('pending_results') || '[]');
+
+            existingSubmissions.push(submission);
+            pendingResults.push(submission);
+
+            localStorage.setItem('localSubmissions', JSON.stringify(existingSubmissions));
+            localStorage.setItem('pending_results', JSON.stringify(pendingResults));
+
+            console.log('📁 Submissão salva localmente:', submission);
+            console.log('📊 Total de submissões pendentes:', pendingResults.length);
+            return { success: true, synced: false, isLocal: true };
+        } catch (error) {
+            console.error('Erro ao salvar submissão localmente:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    migrateOldSubmissions() {
+        try {
+            const oldSubmissions = JSON.parse(localStorage.getItem('localSubmissions') || '[]');
+            const pendingResults = JSON.parse(localStorage.getItem('pending_results') || '[]');
+
+            // Se há submissões antigas que não estão em pending_results
+            if (oldSubmissions.length > 0 && pendingResults.length === 0) {
+                console.log('🔄 Migrando submissões antigas para exportação...');
+                localStorage.setItem('pending_results', JSON.stringify(oldSubmissions));
+                console.log(`✅ ${oldSubmissions.length} submissões migradas`);
+            }
+        } catch (error) {
+            console.warn('Erro ao migrar submissões antigas:', error);
+        }
     }
 };

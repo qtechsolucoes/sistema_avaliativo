@@ -1,5 +1,6 @@
-// src/utils/errorHandler.js - Tratamento de erros centralizado
+// src/utils/errorHandler.js - Tratamento de erros centralizado e seguro
 import { logService } from '../services/logService.js';
+import { SafeNotification } from './sanitizer.js';
 
 class ErrorHandler {
     constructor() {
@@ -53,21 +54,8 @@ class ErrorHandler {
     }
     
     notifyUser(message) {
-        // Cria notificação visual
-        const notification = document.createElement('div');
-        notification.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
-        notification.innerHTML = `
-            <strong>Erro:</strong> ${message}
-            <button onclick="this.parentElement.remove()" class="ml-4">✕</button>
-        `;
-        document.body.appendChild(notification);
-        
-        // Remove após 5 segundos
-        setTimeout(() => {
-            if (notification.parentElement) {
-                notification.remove();
-            }
-        }, 5000);
+        // Usa SafeNotification para evitar XSS
+        SafeNotification.createError('Erro', message, 5000);
     }
     
     async reportToServer(error, context) {

@@ -17,8 +17,15 @@ export function showScreen(screenName) {
     const body = document.body;
 
     // LÓGICA DE LAYOUT CORRIGIDA:
-    // Se a tela for o painel, remove as classes de centralização para permitir a rolagem.
-    if (screenName === 'teacherDashboard') {
+    // Remove classe quiz-active de todas as telas
+    body.classList.remove('quiz-active');
+
+    if (screenName === 'quiz') {
+        // Para a tela do quiz, aplica layout especial
+        body.classList.remove('flex', 'items-center', 'justify-center');
+        body.classList.add('quiz-active');
+    } else if (screenName === 'teacherDashboard') {
+        // Se a tela for o painel, remove as classes de centralização para permitir a rolagem.
         body.classList.remove('flex', 'items-center', 'justify-center');
     } else {
         // Para todas as outras telas, garante que o conteúdo esteja centralizado.

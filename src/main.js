@@ -12,6 +12,11 @@ import { setupModalListeners, setupSidebarListeners } from './ui.js';
 import { teacherModule } from './teacher/index.js';
 import { logService } from './services/logService.js';
 import { errorHandler } from './utils/errorHandler.js';
+import { verifyAdminPassword, verifyUnlockPassword, isAuthLockedOut } from './utils/auth.js';
+import { SafeNotification } from './utils/sanitizer.js';
+import { initializeSupabase, testSupabaseConnection } from './services/supabaseClient.js';
+import { validateConfig } from './config.js';
+import './utils/dbTest.js'; // Importa testes de integração
 import './adaptation.js'; // Importa para garantir que seja incluído no bundle
 
 // ===================================================================================
@@ -19,12 +24,11 @@ import './adaptation.js'; // Importa para garantir que seja incluído no bundle
 // ===================================================================================
 
 const APP_CONFIG = {
-    ADMIN_PASSWORD: "admin123",
-    UNLOCK_PASSWORD: "unlock123",
-    VERSION: "2.0.0",
+    VERSION: "2.0.1",
     DEBUG_MODE: localStorage.getItem('debugMode') === 'true',
     AUTO_SAVE: true,
-    SESSION_TIMEOUT: 30 * 60 * 1000 // 30 minutos
+    SESSION_TIMEOUT: 30 * 60 * 1000, // 30 minutos
+    PERFORMANCE_MONITORING: true
 };
 
 // ===================================================================================
@@ -75,30 +79,20 @@ class SessionManager {
     }
 
     showInactivityWarning() {
-        const warning = document.createElement('div');
+        // Remove aviso anterior se existir
+        const existingWarning = document.getElementById('session-warning');
+        if (existingWarning) {
+            existingWarning.remove();
+        }
+
+        // Cria aviso seguro usando SafeNotification
+        const warning = SafeNotification.createWarning(
+            'Sessão expirando',
+            'Sua sessão expirará em 5 minutos devido à inatividade.',
+            10000
+        );
+
         warning.id = 'session-warning';
-        warning.className = 'fixed top-4 right-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded shadow-lg z-50';
-        warning.innerHTML = `
-            <div class="flex items-center">
-                <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                </svg>
-                <div>
-                    <p class="font-bold">Sessão expirando</p>
-                    <p class="text-sm">Sua sessão expirará em 5 minutos devido à inatividade.</p>
-                </div>
-                <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-yellow-700 hover:text-yellow-900">
-                    ✕
-                </button>
-            </div>
-        `;
-        document.body.appendChild(warning);
-        
-        setTimeout(() => {
-            if (document.getElementById('session-warning')) {
-                warning.remove();
-            }
-        }, 10000);
     }
 
     endSession() {
@@ -129,22 +123,31 @@ class SessionManager {
     }
 
     showSessionExpiredMessage() {
-        const message = document.createElement('div');
-        message.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-        message.innerHTML = `
-            <div class="bg-white rounded-lg p-6 max-w-md">
-                <h3 class="text-lg font-bold mb-2">Sessão Expirada</h3>
-                <p class="text-gray-600 mb-4">
-                    Sua sessão foi encerrada devido à inatividade. 
-                    Por favor, faça login novamente para continuar.
-                </p>
-                <button onclick="this.parentElement.parentElement.remove()" 
-                        class="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
-                    OK
-                </button>
-            </div>
-        `;
-        document.body.appendChild(message);
+        // Cria modal seguro para sessão expirada
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+
+        const modal = document.createElement('div');
+        modal.className = 'bg-white rounded-lg p-6 max-w-md mx-4';
+
+        const title = document.createElement('h3');
+        title.className = 'text-lg font-bold mb-2';
+        title.textContent = 'Sessão Expirada';
+
+        const message = document.createElement('p');
+        message.className = 'text-gray-600 mb-4';
+        message.textContent = 'Sua sessão foi encerrada devido à inatividade. Por favor, faça login novamente para continuar.';
+
+        const button = document.createElement('button');
+        button.className = 'w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700';
+        button.textContent = 'OK';
+        button.onclick = () => overlay.remove();
+
+        modal.appendChild(title);
+        modal.appendChild(message);
+        modal.appendChild(button);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
     }
 
     stop() {
@@ -217,52 +220,44 @@ function resetApp() {
 }
 
 /**
- * Desbloqueia o dispositivo com verificação de senha
+ * Desbloqueia o dispositivo com verificação de senha segura
  */
-function unlockDevice() {
-    const maxAttempts = 3;
-    const attemptsKey = 'unlock_attempts';
-    const lockoutKey = 'unlock_lockout';
-    
-    // Verifica se está em lockout
-    const lockoutTime = localStorage.getItem(lockoutKey);
-    if (lockoutTime && Date.now() < parseInt(lockoutTime)) {
-        const remainingTime = Math.ceil((parseInt(lockoutTime) - Date.now()) / 1000 / 60);
-        alert(`Muitas tentativas falhas. Tente novamente em ${remainingTime} minutos.`);
-        return;
-    }
-    
-    const password = prompt("Para desbloquear, insira a senha do administrador:");
-    
-    if (password === null) return; // Usuário cancelou
-    
-    if (password === APP_CONFIG.ADMIN_PASSWORD || password === APP_CONFIG.UNLOCK_PASSWORD) {
-        // Senha correta
-        localStorage.removeItem('deviceLocked');
-        localStorage.removeItem(attemptsKey);
-        localStorage.removeItem(lockoutKey);
-        
-        logService.info('Dispositivo desbloqueado com sucesso');
-        alert("Dispositivo desbloqueado com sucesso!");
-        resetApp();
-        
-    } else {
-        // Senha incorreta
-        let attempts = parseInt(localStorage.getItem(attemptsKey) || '0') + 1;
-        localStorage.setItem(attemptsKey, attempts.toString());
-        
-        if (attempts >= maxAttempts) {
-            // Bloqueia por 15 minutos após 3 tentativas
-            const lockoutDuration = 15 * 60 * 1000; // 15 minutos
-            localStorage.setItem(lockoutKey, (Date.now() + lockoutDuration).toString());
-            localStorage.removeItem(attemptsKey);
-            
-            logService.warn('Dispositivo bloqueado por tentativas excessivas');
-            alert("Muitas tentativas incorretas. Dispositivo bloqueado por 15 minutos.");
-        } else {
-            const remaining = maxAttempts - attempts;
-            alert(`Senha incorreta. ${remaining} tentativa(s) restante(s).`);
+async function unlockDevice() {
+    try {
+        // Verifica se está em lockout
+        const lockStatus = isAuthLockedOut();
+        if (lockStatus.locked) {
+            SafeNotification.createError(
+                'Dispositivo Bloqueado',
+                `Muitas tentativas falhas. Tente novamente em ${lockStatus.remainingMinutes} minutos.`
+            );
+            return;
         }
+
+        const password = prompt("Para desbloquear, insira a senha do administrador:");
+
+        if (password === null) return; // Usuário cancelou
+
+        const isValid = await verifyUnlockPassword(password);
+
+        if (isValid) {
+            // Senha correta
+            localStorage.removeItem('deviceLocked');
+
+            logService.info('Dispositivo desbloqueado com sucesso');
+            SafeNotification.createSuccess(
+                'Sucesso',
+                'Dispositivo desbloqueado com sucesso!'
+            );
+            resetApp();
+        }
+
+    } catch (error) {
+        SafeNotification.createError(
+            'Erro de Autenticação',
+            error.message
+        );
+        logService.warn('Tentativa de desbloqueio falhou', { error: error.message });
     }
 }
 
@@ -324,21 +319,28 @@ function clearAllNotifications() {
 class PerformanceMonitor {
     constructor() {
         this.metrics = [];
-        this.isMonitoring = APP_CONFIG.DEBUG_MODE;
+        this.isMonitoring = APP_CONFIG.PERFORMANCE_MONITORING && APP_CONFIG.DEBUG_MODE;
+        this.memoryInterval = null;
+        this.maxMetrics = 1000; // Limita número de métricas armazenadas
     }
 
     start() {
         if (!this.isMonitoring) return;
-        
+
         // Monitora tempo de carregamento
         window.addEventListener('load', () => {
             const loadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
             logService.debug(`Tempo de carregamento: ${loadTime}ms`);
         });
-        
-        // Monitora memória (se disponível)
+
+        // Monitora memória (se disponível) com limpeza adequada
         if (performance.memory) {
-            setInterval(() => {
+            this.memoryInterval = setInterval(() => {
+                if (!this.isMonitoring) {
+                    this.stop();
+                    return;
+                }
+
                 const memoryInfo = {
                     usedJSHeapSize: (performance.memory.usedJSHeapSize / 1048576).toFixed(2) + ' MB',
                     totalJSHeapSize: (performance.memory.totalJSHeapSize / 1048576).toFixed(2) + ' MB',
@@ -349,23 +351,66 @@ class PerformanceMonitor {
         }
     }
 
+    stop() {
+        if (this.memoryInterval) {
+            clearInterval(this.memoryInterval);
+            this.memoryInterval = null;
+        }
+
+        // Limpa métricas antigas
+        this.metrics = [];
+        logService.debug('Performance Monitor parado e limpo');
+    }
+
     measureOperation(operationName, fn) {
         if (!this.isMonitoring) return fn();
-        
+
         const startTime = performance.now();
         const result = fn();
         const endTime = performance.now();
-        
+
         const duration = endTime - startTime;
         logService.debug(`${operationName}: ${duration.toFixed(2)}ms`);
-        
+
+        // Adiciona métrica com limite
         this.metrics.push({
             operation: operationName,
             duration,
             timestamp: Date.now()
         });
-        
+
+        // Remove métricas antigas se exceder limite
+        if (this.metrics.length > this.maxMetrics) {
+            this.metrics = this.metrics.slice(-this.maxMetrics * 0.8); // Remove 20% das mais antigas
+        }
+
         return result;
+    }
+
+    getMetricsSummary() {
+        if (!this.isMonitoring) return null;
+
+        const summary = {};
+        this.metrics.forEach(metric => {
+            if (!summary[metric.operation]) {
+                summary[metric.operation] = {
+                    count: 0,
+                    totalDuration: 0,
+                    avgDuration: 0,
+                    minDuration: Infinity,
+                    maxDuration: 0
+                };
+            }
+
+            const op = summary[metric.operation];
+            op.count++;
+            op.totalDuration += metric.duration;
+            op.minDuration = Math.min(op.minDuration, metric.duration);
+            op.maxDuration = Math.max(op.maxDuration, metric.duration);
+            op.avgDuration = op.totalDuration / op.count;
+        });
+
+        return summary;
     }
 }
 
@@ -392,18 +437,41 @@ function initializeApp() {
     });
     
     try {
+        // Valida configuração
+        const configValidation = validateConfig();
+        if (!configValidation.isValid) {
+            console.warn('⚠️ Problemas de configuração detectados:', configValidation.errors);
+        }
+
+        // Inicializa Supabase
+        console.log('🔌 Inicializando conexão com banco de dados...');
+        const supabaseClient = initializeSupabase();
+
+        if (supabaseClient) {
+            // Testa conectividade em background
+            testSupabaseConnection().then(isConnected => {
+                if (isConnected) {
+                    console.log('✅ Conexão com Supabase confirmada - dados reais disponíveis');
+                } else {
+                    console.log('⚠️ Problemas de conectividade - usando dados mock como fallback');
+                }
+            });
+        } else {
+            console.log('📴 Modo offline - usando dados mock');
+        }
+
         // Inicia monitoramento de performance
         performanceMonitor.start();
-        
+
         // Inicializa todos os módulos principais
         performanceMonitor.measureOperation('Inicialização de módulos', () => {
             initializeLoginScreen(startAssessmentFlow);
             initializeQuizScreen();
             setupModalListeners(finishAssessment);
             setupSidebarListeners();
-            
+
             // Inicializa módulo do professor
-            teacherModule.initialize(resetApp, APP_CONFIG.ADMIN_PASSWORD);
+            teacherModule.initialize(resetApp, verifyAdminPassword);
         });
         
         // Configura listeners dos botões de navegação
@@ -623,23 +691,53 @@ if (document.readyState === 'loading') {
 
 // Exporta funções úteis para debug no console
 if (APP_CONFIG.DEBUG_MODE) {
-    window.debugApp = {
-        state,
-        config: APP_CONFIG,
-        resetApp,
-        unlockDevice,
-        sessionManager,
-        performanceMonitor,
-        logService,
-        toggleDebugMode,
-        exportLogs: () => logService.exportLogs(),
-        clearStorage: () => {
-            if (confirm('Limpar todo o localStorage?')) {
-                localStorage.clear();
-                location.reload();
-            }
-        }
-    };
-    
-    console.log('🐛 Debug Mode Ativo - Use window.debugApp para acessar ferramentas de debug');
+    import('./services/supabaseClient.js').then(({ getSupabaseClient, testSupabaseConnection, reinitializeSupabase }) => {
+        import('./services/dataService.js').then(({ dataService, recreateDataService }) => {
+            window.debugApp = {
+                state,
+                config: APP_CONFIG,
+                resetApp,
+                unlockDevice,
+                sessionManager,
+                performanceMonitor,
+                logService,
+                toggleDebugMode,
+                exportLogs: () => logService.exportLogs(),
+                clearStorage: () => {
+                    if (confirm('Limpar todo o localStorage?')) {
+                        localStorage.clear();
+                        location.reload();
+                    }
+                },
+                // Ferramentas de debug do Supabase
+                supabase: {
+                    client: getSupabaseClient(),
+                    testConnection: testSupabaseConnection,
+                    reinitialize: reinitializeSupabase,
+                    status: () => {
+                        const client = getSupabaseClient();
+                        return {
+                            hasClient: !!client,
+                            url: client?.supabaseUrl || 'N/A',
+                            mode: client ? 'online' : 'offline'
+                        };
+                    }
+                },
+                // Ferramentas de debug do dataService
+                dataService: {
+                    instance: dataService,
+                    recreate: recreateDataService,
+                    testClassesByGrade: (grade) => dataService.getClassesByGrade(grade),
+                    testStudentsByClass: (classId) => dataService.getStudentsByClass(classId),
+                    testAssessment: (grade) => dataService.getAssessmentData(grade)
+                }
+            };
+
+            console.log('🐛 Debug Mode Ativo - Use window.debugApp para acessar ferramentas de debug');
+            console.log('📋 Comandos úteis:');
+            console.log('  window.debugApp.supabase.status() - Status da conexão');
+            console.log('  window.debugApp.supabase.testConnection() - Testar conectividade');
+            console.log('  window.debugApp.dataService.testClassesByGrade(6) - Testar busca de turmas');
+        });
+    });
 }
