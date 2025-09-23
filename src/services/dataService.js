@@ -769,6 +769,324 @@ class OnlineDataService {
             return [];
         }
     }
+
+    // ===================================================================================
+    // FUNÇÕES PARA CONTEÚDO ADAPTATIVO
+    // ===================================================================================
+
+    async getAdaptiveSupportTexts(adaptationType, grade) {
+        if (!(await this.ensureConnection())) {
+            logService.warn('Conexão Supabase falhou para textos adaptativos - usando mock');
+            return this.getMockAdaptiveTexts(adaptationType, grade);
+        }
+
+        try {
+            logService.info('Buscando textos de apoio adaptativos', { adaptationType, grade });
+
+            const { data: texts, error } = await this.client
+                .from('adaptive_support_texts')
+                .select('*')
+                .eq('adaptation_type', adaptationType)
+                .eq('grade', grade)
+                .order('created_at');
+
+            if (error) {
+                logService.error('Erro ao buscar textos adaptativos:', error);
+                return this.getMockAdaptiveTexts(adaptationType, grade);
+            }
+
+            logService.info(`Encontrados ${texts?.length || 0} textos adaptativos`);
+            return texts || [];
+
+        } catch (error) {
+            logService.error('Erro crítico ao buscar textos adaptativos:', error);
+            return this.getMockAdaptiveTexts(adaptationType, grade);
+        }
+    }
+
+    async getAdaptiveQuestions(adaptationType, grade) {
+        if (!(await this.ensureConnection())) {
+            logService.warn('Conexão Supabase falhou para questões adaptativas - usando mock');
+            return this.getMockAdaptiveQuestions(adaptationType, grade);
+        }
+
+        try {
+            logService.info('Buscando questões adaptativas', { adaptationType, grade });
+
+            const { data: questions, error } = await this.client
+                .from('adaptive_questions')
+                .select('*')
+                .eq('adaptation_type', adaptationType)
+                .eq('grade', grade)
+                .order('created_at');
+
+            if (error) {
+                logService.error('Erro ao buscar questões adaptativas:', error);
+                return this.getMockAdaptiveQuestions(adaptationType, grade);
+            }
+
+            // Processa as opções das questões
+            const processedQuestions = (questions || []).map(q => ({
+                ...q,
+                options: this.processAdaptiveQuestionOptions(q.options)
+            }));
+
+            logService.info(`Encontradas ${processedQuestions.length} questões adaptativas`);
+            return processedQuestions;
+
+        } catch (error) {
+            logService.error('Erro crítico ao buscar questões adaptativas:', error);
+            return this.getMockAdaptiveQuestions(adaptationType, grade);
+        }
+    }
+
+    async getAdaptiveGames(adaptationType, grade) {
+        if (!(await this.ensureConnection())) {
+            logService.warn('Conexão Supabase falhou para jogos adaptativos - usando mock');
+            return this.getMockAdaptiveGames(adaptationType, grade);
+        }
+
+        try {
+            logService.info('Buscando jogos adaptativos', { adaptationType, grade });
+
+            const { data: games, error } = await this.client
+                .from('adaptive_games')
+                .select('*')
+                .eq('adaptation_type', adaptationType)
+                .eq('grade', grade)
+                .order('difficulty_level', { ascending: true });
+
+            if (error) {
+                logService.error('Erro ao buscar jogos adaptativos:', error);
+                return this.getMockAdaptiveGames(adaptationType, grade);
+            }
+
+            logService.info(`Encontrados ${games?.length || 0} jogos adaptativos`);
+            return games || [];
+
+        } catch (error) {
+            logService.error('Erro crítico ao buscar jogos adaptativos:', error);
+            return this.getMockAdaptiveGames(adaptationType, grade);
+        }
+    }
+
+    async getAdaptiveFeedback(adaptationType, feedbackType) {
+        if (!(await this.ensureConnection())) {
+            logService.warn('Conexão Supabase falhou para feedback adaptativo - usando mock');
+            return this.getMockAdaptiveFeedback(adaptationType, feedbackType);
+        }
+
+        try {
+            logService.info('Buscando feedback adaptativo', { adaptationType, feedbackType });
+
+            const { data: feedback, error } = await this.client
+                .from('adaptive_feedback')
+                .select('*')
+                .eq('adaptation_type', adaptationType)
+                .eq('feedback_type', feedbackType);
+
+            if (error) {
+                logService.error('Erro ao buscar feedback adaptativo:', error);
+                return this.getMockAdaptiveFeedback(adaptationType, feedbackType);
+            }
+
+            logService.info(`Encontrado feedback adaptativo: ${feedback?.length || 0} items`);
+            return feedback || [];
+
+        } catch (error) {
+            logService.error('Erro crítico ao buscar feedback adaptativo:', error);
+            return this.getMockAdaptiveFeedback(adaptationType, feedbackType);
+        }
+    }
+
+    processAdaptiveQuestionOptions(options) {
+        try {
+            let processedOptions = [];
+
+            if (typeof options === 'string') {
+                processedOptions = JSON.parse(options);
+            } else if (Array.isArray(options)) {
+                processedOptions = options;
+            } else {
+                logService.warn('Formato de opções não reconhecido:', typeof options);
+                return [
+                    { text: 'Opção A', isCorrect: true },
+                    { text: 'Opção B', isCorrect: false }
+                ];
+            }
+
+            // Verifica se há pelo menos uma resposta correta
+            const hasCorrectAnswer = processedOptions.some(opt => opt.isCorrect === true);
+            if (!hasCorrectAnswer && processedOptions.length > 0) {
+                processedOptions[0].isCorrect = true;
+                logService.warn('Questão adaptativa sem resposta correta - primeira opção marcada como correta');
+            }
+
+            return processedOptions;
+
+        } catch (error) {
+            logService.error('Erro ao processar opções de questão adaptativa:', error);
+            return [
+                { text: 'Erro ao carregar opções', isCorrect: true },
+                { text: 'Questão inválida', isCorrect: false }
+            ];
+        }
+    }
+
+    // ===================================================================================
+    // DADOS MOCK PARA CONTEÚDO ADAPTATIVO (FALLBACK)
+    // ===================================================================================
+
+    getMockAdaptiveTexts(adaptationType, grade) {
+        const mockTexts = {
+            'tea': {
+                6: [{
+                    id: 'tea-6-1',
+                    title: 'O que é Cultura?',
+                    simplified_text: 'Cultura é tudo que as pessoas fazem juntas.\n\nExemplos de cultura:\n• Como cozinhamos\n• Como dançamos\n• Como falamos\n• Como nos vestimos\n\nCada grupo tem sua cultura.\nTodas as culturas são importantes.',
+                    visual_elements: 'ícones: casa, comida, dança, roupa',
+                    interaction_hints: 'Leia devagar, uma informação por vez'
+                }]
+            },
+            'tdah': {
+                6: [{
+                    id: 'tdah-6-1',
+                    title: 'Cultura em Ação!',
+                    simplified_text: 'CULTURA = o que fazemos em grupo!\n\nFATOS RÁPIDOS:\n✓ Comida típica = cultura\n✓ Dança regional = cultura\n✓ Jeito de falar = cultura\n✓ Festas locais = cultura\n\nMISSÃO: Encontre exemplos de cultura ao seu redor!',
+                    visual_elements: 'cores vibrantes, ícones energéticos',
+                    interaction_hints: 'Tarefas rápidas, pausas para movimento'
+                }]
+            },
+            'down': {
+                6: [{
+                    id: 'down-6-1',
+                    title: 'Nossa Cultura é Linda!',
+                    simplified_text: 'Cultura é como nossa família vive!\n\nNA NOSSA CASA:\n• Comida gostosa que mamãe faz\n• Música que papai gosta\n• Brincadeiras com irmãos\n• Festas com parentes\n\nCADA FAMÍLIA É ESPECIAL!\nSua cultura é importante e bonita!\n\nVocê faz parte da nossa cultura!',
+                    visual_elements: 'fotos de família, cores alegres, corações',
+                    interaction_hints: 'Reforço positivo, conexão pessoal'
+                }]
+            }
+        };
+
+        return mockTexts[adaptationType]?.[grade] || [];
+    }
+
+    getMockAdaptiveQuestions(adaptationType, grade) {
+        const mockQuestions = {
+            'tea': {
+                6: [{
+                    id: 'tea-q-6-1',
+                    question_text: 'O que é cultura?',
+                    options: [
+                        { text: 'Tudo que as pessoas fazem juntas', isCorrect: true },
+                        { text: 'Apenas leis do país', isCorrect: false }
+                    ],
+                    visual_aids: 'diagrama simples de conceitos',
+                    difficulty_level: 1,
+                    success_feedback: 'Correto! Cultura é o que fazemos em grupo.',
+                    encouragement_feedback: 'Quase lá! Pense no que sua família faz junto.'
+                }]
+            },
+            'tdah': {
+                6: [{
+                    id: 'tdah-q-6-1',
+                    question_text: 'DESAFIO RÁPIDO: A sombrinha do frevo é que tipo de cultura?',
+                    options: [
+                        { text: 'Material (você pode tocar!)', isCorrect: true },
+                        { text: 'Imaterial (não pode tocar)', isCorrect: false }
+                    ],
+                    visual_aids: 'gif de sombrinha do frevo',
+                    difficulty_level: 2,
+                    success_feedback: 'ACERTOU! A sombrinha é material!',
+                    encouragement_feedback: 'Quase! Material = você pode pegar!'
+                }]
+            },
+            'down': {
+                9: [{
+                    id: 'down-q-9-1',
+                    question_text: 'Qual dança é rápida e usa instrumentos de sopro?',
+                    options: [
+                        { text: 'FREVO!', isCorrect: true },
+                        { text: 'Ciranda', isCorrect: false }
+                    ],
+                    visual_aids: 'vídeos de dança, sons de instrumentos',
+                    difficulty_level: 1,
+                    success_feedback: 'PARABÉNS! Você é um expert em frevo!',
+                    encouragement_feedback: 'Quase acertou! O frevo é bem rápido e animado!'
+                }]
+            }
+        };
+
+        return mockQuestions[adaptationType]?.[grade] || [];
+    }
+
+    getMockAdaptiveGames(adaptationType, grade) {
+        const mockGames = {
+            'down': {
+                6: [{
+                    id: 'down-game-6-1',
+                    game_type: 'memory',
+                    title: 'Jogo da Memória Cultural',
+                    description: 'Encontre os pares entre cultura material e imaterial!',
+                    content: 'Pares: Violão-Música, Panela-Receita, Fantasia-Dança, Livro-História',
+                    instructions: 'Encontre os pares! Cada cultura material tem sua cultura imaterial.',
+                    learning_objectives: 'Distinguir cultura material de imaterial, Desenvolver memória visual',
+                    estimated_duration_minutes: 5,
+                    difficulty_level: 1,
+                    rewards: '3 estrelas, Badge: Detetive Cultural'
+                }]
+            },
+            'tea': {
+                8: [{
+                    id: 'tea-game-8-1',
+                    game_type: 'sequence',
+                    title: 'Linha do Tempo Medieval',
+                    description: 'Coloque os eventos da música medieval em ordem.',
+                    content: 'Eventos: 1-Canto Gregoriano, 2-Trovadores, 3-Polifonia',
+                    instructions: 'Arraste os eventos para a ordem correta na linha do tempo.',
+                    learning_objectives: 'Compreender evolução musical medieval, Desenvolver sequência lógica',
+                    estimated_duration_minutes: 4,
+                    difficulty_level: 2,
+                    rewards: 'Badge: Historiador Musical'
+                }]
+            },
+            'tdah': {
+                9: [{
+                    id: 'tdah-game-9-1',
+                    game_type: 'match',
+                    title: 'Ritmos PE - Correspondência Turbo!',
+                    description: 'Conecte cada ritmo com suas características rapidamente!',
+                    content: 'FREVO: Rápido, Sombrinha, Sopros | MARACATU: Tambores, Cortejo, Reis | CIRANDA: Roda, Praia, Mãos dadas',
+                    instructions: 'MISSÃO: Conecte o ritmo com suas características o mais rápido possível!',
+                    learning_objectives: 'Identificar características dos ritmos, Desenvolver agilidade mental',
+                    estimated_duration_minutes: 3,
+                    difficulty_level: 2,
+                    rewards: 'Bônus de velocidade, Ranks: Novato, Bom, Expert, Mestre PE'
+                }]
+            }
+        };
+
+        return mockGames[adaptationType]?.[grade] || [];
+    }
+
+    getMockAdaptiveFeedback(adaptationType, feedbackType) {
+        const mockFeedback = {
+            'tea': {
+                'success': [{ content: 'Correto! Você entendeu.', visual_style: 'green_check', animation_type: 'simple_check' }],
+                'encouragement': [{ content: 'Tente novamente. Você consegue.', visual_style: 'blue_support', animation_type: 'gentle_pulse' }]
+            },
+            'tdah': {
+                'success': [{ content: 'ACERTOU! Você é rápido!', visual_style: 'orange_burst', animation_type: 'energetic_bounce' }],
+                'celebration': [{ content: 'MISSÃO CUMPRIDA! Você é incrível!', visual_style: 'rainbow_confetti', animation_type: 'celebration_burst' }]
+            },
+            'down': {
+                'success': [{ content: 'Parabéns! Você é muito inteligente!', visual_style: 'hearts_stars', animation_type: 'warm_celebration' }],
+                'encouragement': [{ content: 'Muito bem! Continue tentando!', visual_style: 'smile_thumbs', animation_type: 'encouraging_bounce' }]
+            }
+        };
+
+        return mockFeedback[adaptationType]?.[feedbackType] || [];
+    }
 }
 
 /**

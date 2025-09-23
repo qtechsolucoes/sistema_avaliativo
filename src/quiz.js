@@ -4,7 +4,7 @@ import { state, dom, updateState } from './state.js';
 import { showScreen } from './navigation.js';
 import { getAssessmentData, saveSubmission } from './database.js';
 import { showConfirmationModal, handleVisibilityChange } from './ui.js';
-import { routeAssessment } from './adaptation.js';
+import { routeAssessment } from './adaptive/index.js';
 import { logService } from './services/logService.js';
 import { HTMLSanitizer } from './utils/sanitizer.js';
 

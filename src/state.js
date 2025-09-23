@@ -22,7 +22,9 @@ export const dom = {
         teacherDashboard: document.getElementById('teacher-dashboard'),
         locked: document.getElementById('locked-screen'),
         // ADICIONADO: Nova tela de avaliação
-        dragDrop: document.getElementById('drag-drop-screen')
+        dragDrop: document.getElementById('drag-drop-screen'),
+        // ADICIONADO: Tela de jogos adaptativos
+        adaptiveGames: document.getElementById('adaptive-games-screen')
     },
     login: {
         yearSelect: document.getElementById('year-select'),
@@ -89,6 +91,23 @@ export const dom = {
         targetsContainer: document.getElementById('drop-targets-container'),
         feedback: document.getElementById('drag-drop-feedback'),
         nextBtn: document.getElementById('drag-drop-next-btn')
+    },
+    // ADICIONADO: Elementos dos jogos adaptativos
+    adaptiveGames: {
+        screen: document.getElementById('adaptive-games-screen'),
+        container: document.getElementById('adaptive-game-container'),
+        header: document.getElementById('adaptive-game-header'),
+        title: document.getElementById('adaptive-game-title'),
+        subtitle: document.getElementById('adaptive-game-subtitle'),
+        info: document.getElementById('adaptive-game-info'),
+        score: document.getElementById('adaptive-game-score'),
+        level: document.getElementById('adaptive-game-level'),
+        area: document.getElementById('adaptive-game-area'),
+        controls: document.getElementById('adaptive-game-controls'),
+        feedback: document.getElementById('adaptive-game-feedback'),
+        hintBtn: document.getElementById('adaptive-game-hint-btn'),
+        nextBtn: document.getElementById('adaptive-game-next-btn'),
+        finishBtn: document.getElementById('adaptive-game-finish-btn')
     }
 };
 

@@ -17,7 +17,7 @@ import { SafeNotification } from './utils/sanitizer.js';
 import { initializeSupabase, testSupabaseConnection } from './services/supabaseClient.js';
 import { validateConfig } from './config.js';
 import './utils/dbTest.js'; // Importa testes de integração
-import './adaptation.js'; // Importa para garantir que seja incluído no bundle
+import './adaptive/index.js'; // Sistema adaptativo modularizado
 
 // ===================================================================================
 // CONFIGURAÇÕES GLOBAIS
