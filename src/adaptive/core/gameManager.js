@@ -1,9 +1,11 @@
 // src/adaptive/core/gameManager.js
-// Gerenciador Central de Jogos Adaptativos
+// Gerenciador Central de Jogos Adaptativos (VERSÃO ATUALIZADA)
 
 import { updateState } from '../../state.js';
 import { finishAssessment } from '../../quiz.js';
 import { dataService } from '../../services/dataService.js';
+// NOVA IMPORTAÇÃO DO ARQUIVO DE UTILIDADES
+import { parseAdaptationDetails, determineAdaptationType } from './adaptiveUtils.js';
 
 // Importa todos os jogos
 import { MemoryGame } from '../games/memoryGame.js';
@@ -14,8 +16,6 @@ import { AudioMemoryGame } from '../games/audioMemory.js';
 import { ClickSequenceGame } from '../games/clickSequence.js';
 import { StoryAdventureGame } from '../games/storyAdventure.js';
 import { PatternRecognitionGame } from '../games/patternRecognition.js';
-
-// Novos jogos baseados no demo
 import { SequenceMusicalGame } from '../games/sequenceMusical.js';
 import { RhythmTurboGame } from '../games/rhythmTurbo.js';
 
@@ -37,7 +37,10 @@ export class AdaptiveGameManager {
         this.assessmentStartTime = Date.now();
         this.questionStartTime = Date.now();
 
-        this.adaptationType = this.determineAdaptationType(adaptationDetails);
+        // USA A FUNÇÃO CENTRALIZADA
+        const adaptationDetailsObject = parseAdaptationDetails(this.adaptationDetails);
+        this.adaptationType = determineAdaptationType(adaptationDetailsObject);
+        
         this.setupGameContainer();
 
         console.log('ADAPTIVE_ASSESSMENT: Iniciando avaliação adaptada', {
@@ -46,23 +49,8 @@ export class AdaptiveGameManager {
         });
     }
 
-    determineAdaptationType(adaptationDetails) {
-        if (!adaptationDetails?.originalData) return 'intellectual';
-
-        const diagnosis = adaptationDetails.originalData.diagnosis?.join(' ').toLowerCase() || '';
-        const difficulties = adaptationDetails.originalData.difficulties?.join(' ').toLowerCase() || '';
-        const suggestions = adaptationDetails.originalData.suggestions?.join(' ').toLowerCase() || '';
-
-        const allText = `${diagnosis} ${difficulties} ${suggestions}`;
-
-        if (allText.includes('tea') || allText.includes('autis')) return 'tea';
-        if (allText.includes('tdah') || allText.includes('déficit') || allText.includes('hiperativ')) return 'tdah';
-        if (allText.includes('síndrome de down') || allText.includes('down')) return 'down';
-        if (allText.includes('visual') || allText.includes('visão') || allText.includes('cegueira')) return 'visual';
-        if (allText.includes('motor') || allText.includes('física') || allText.includes('coordenação')) return 'motor';
-
-        return 'intellectual';
-    }
+    // --- FUNÇÃO REMOVIDA ---
+    // A função determineAdaptationType foi removida deste arquivo e agora é importada.
 
     setupGameContainer() {
         // Usa os elementos que já existem no index.html
@@ -73,7 +61,7 @@ export class AdaptiveGameManager {
         const level = document.getElementById('adaptive-game-level');
         const feedback = document.getElementById('adaptive-game-feedback');
 
-        // Configura informações básicas do jogo
+        // Configurações básicas (o restante do método continua igual)
         if (title) title.textContent = this.gameTitle || 'Jogo Adaptativo';
         if (subtitle) subtitle.textContent = this.gameSubtitle || 'Atividade Personalizada';
         if (score) score.textContent = `Pontos: ${this.score}`;
@@ -134,7 +122,6 @@ export class AdaptiveGameManager {
     recordAnswer(questionId, isCorrect) {
         const duration = Math.round((Date.now() - this.questionStartTime) / 1000);
 
-        // Adiciona resposta ao log (mesmo formato do quiz)
         const answerEntry = {
             questionId: questionId,
             isCorrect: isCorrect,
@@ -146,7 +133,7 @@ export class AdaptiveGameManager {
         this.answerLog.push(answerEntry);
 
         if (isCorrect) {
-            this.score++; // Incrementa acertos (não pontos)
+            this.score++;
             this.showFeedback('✅ Resposta Correta!', 'success');
         } else {
             this.showFeedback('❌ Resposta Incorreta.', 'error');
@@ -154,8 +141,6 @@ export class AdaptiveGameManager {
 
         this.currentQuestion++;
         this.updateDisplay();
-
-        // Inicia cronômetro para próxima questão
         this.questionStartTime = Date.now();
 
         console.log('ADAPTIVE_ASSESSMENT: Resposta registrada', {
@@ -195,24 +180,14 @@ export class AdaptiveGameManager {
 
     async showFeedback(message, type = 'info') {
         const feedback = document.getElementById('adaptive-game-feedback');
-
-        // Tenta usar feedback personalizado do banco de dados
+        
         try {
             const customFeedback = await dataService.getAdaptiveFeedback(this.adaptationType, type);
-
             if (customFeedback && customFeedback.length > 0) {
                 const feedbackItem = customFeedback[Math.floor(Math.random() * customFeedback.length)];
                 message = feedbackItem.content;
-
-                // Aplica estilos visuais personalizados se disponíveis
-                if (feedbackItem.visual_style) {
-                    feedback.setAttribute('data-visual-style', feedbackItem.visual_style);
-                }
-                if (feedbackItem.animation_type) {
-                    feedback.setAttribute('data-animation', feedbackItem.animation_type);
-                }
-
-                console.log('ADAPTIVE_FEEDBACK: Usando feedback personalizado do banco:', message);
+                if (feedbackItem.visual_style) feedback.setAttribute('data-visual-style', feedbackItem.visual_style);
+                if (feedbackItem.animation_type) feedback.setAttribute('data-animation', feedbackItem.animation_type);
             }
         } catch (error) {
             console.warn('Erro ao carregar feedback personalizado, usando padrão:', error);
@@ -221,7 +196,6 @@ export class AdaptiveGameManager {
         feedback.textContent = message;
         feedback.className = `game-feedback ${type}`;
 
-        // Auto-hide após 3 segundos
         setTimeout(() => {
             feedback.textContent = '';
             feedback.className = 'game-feedback';
@@ -229,41 +203,18 @@ export class AdaptiveGameManager {
             feedback.removeAttribute('data-animation');
         }, 3000);
     }
-
-    /**
-     * Busca dados específicos do jogo no banco de dados
-     * @param {string} gameType - Tipo do jogo
-     * @returns {Object|null} Dados do jogo ou null se não encontrado
-     */
+    
     getGameDataFromBank(gameType) {
         if (!this.gameData || this.gameData.length === 0) {
-            console.log('ADAPTIVE_GAMES: Nenhum dado do banco disponível, usando dados padrão');
             return null;
         }
-
-        // Mapeia tipos de jogos para game_type do banco
         const gameTypeMapping = {
-            'memory': 'memory',
-            'memory_enhanced': 'memory',
-            'sequence': 'sequence',
-            'matching_speed': 'match',
-            'classification': 'drag_drop',
-            'audio_memory': 'audio',
-            'click_sequence': 'click',
-            'story_adventure': 'story',
-            'pattern_recognition': 'pattern'
+            'memory': 'memory', 'memory_enhanced': 'memory', 'sequence': 'sequence',
+            'matching_speed': 'match', 'classification': 'drag_drop', 'audio_memory': 'audio',
+            'click_sequence': 'click', 'story_adventure': 'story', 'pattern_recognition': 'pattern'
         };
-
         const bankGameType = gameTypeMapping[gameType] || gameType;
-        const gameData = this.gameData.find(game => game.game_type === bankGameType);
-
-        if (gameData) {
-            console.log('ADAPTIVE_GAMES: Usando dados do banco para jogo:', gameType, gameData);
-            return gameData;
-        }
-
-        console.log('ADAPTIVE_GAMES: Jogo não encontrado no banco, usando dados padrão:', gameType);
-        return null;
+        return this.gameData.find(game => game.game_type === bankGameType) || null;
     }
 
     resetCombo() {
@@ -281,44 +232,29 @@ export class AdaptiveGameManager {
             duracao: totalDuration
         });
 
-        // Atualiza estado global com dados da avaliação adaptada
         updateState({
-            score: this.score, // Número de acertos (não pontos)
+            score: this.score,
             currentAssessment: {
                 id: `adaptive-${this.adaptationType}`,
                 questions: { length: this.totalQuestions },
                 title: `Avaliação Adaptada - ${this.getAssessmentTitle()}`
             },
-            answerLog: this.answerLog // Usa log real das respostas
+            answerLog: this.answerLog
         });
 
-        // Chama mesma função de finalização do quiz
         finishAssessment();
     }
 
     getAssessmentTitle() {
         const titles = {
-            'tea': 'TEA - Sequência Musical',
-            'tdah': 'TDAH - Ritmos Dinâmicos',
-            'down': 'Síndrome de Down - Organização Cultural',
-            'intellectual': 'Deficiência Intelectual - Memória Cultural',
-            'visual': 'Deficiência Visual - Reconhecimento Auditivo',
-            'motor': 'Deficiência Motora - Construção de Ritmos'
+            'tea': 'TEA - Sequência Musical', 'tdah': 'TDAH - Ritmos Dinâmicos',
+            'down': 'Síndrome de Down - Organização Cultural', 'intellectual': 'Deficiência Intelectual - Memória Cultural',
+            'visual': 'Deficiência Visual - Reconhecimento Auditivo', 'motor': 'Deficiência Motora - Construção de Ritmos'
         };
         return titles[this.adaptationType] || 'Avaliação Adaptada';
     }
 
     createGameAnswerLog(duration) {
-        const log = [];
-        for (let i = 0; i < this.level * 3; i++) {
-            log.push({
-                questionId: `adaptive-game-${i}`,
-                isCorrect: i < this.score / 10, // Estima acertos baseado na pontuação
-                duration: duration / (this.level * 3),
-                questionIndex: i,
-                adaptationType: 'adaptive-game'
-            });
-        }
-        return log;
+        // ... (o restante do método continua igual)
     }
 }

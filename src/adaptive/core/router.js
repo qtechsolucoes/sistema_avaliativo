@@ -1,11 +1,13 @@
 // src/adaptive/core/router.js
-// Roteamento Inteligente para Sistema Adaptativo
+// Roteamento Inteligente para Sistema Adaptativo (VERSÃO ATUALIZADA)
 
 import { showScreen } from '../../navigation.js';
 import { state } from '../../state.js';
 import { AdaptiveGameManager } from './gameManager.js';
 import { dataService } from '../../services/dataService.js';
 import { startStandardAssessment as startStandardAssessmentQuiz } from '../../quiz.js';
+// NOVA IMPORTAÇÃO DO ARQUIVO DE UTILIDADES
+import { parseAdaptationDetails, determineAdaptationType } from './adaptiveUtils.js';
 
 /**
  * Roteamento principal do sistema adaptativo
@@ -14,48 +16,29 @@ import { startStandardAssessment as startStandardAssessmentQuiz } from '../../qu
 export async function routeAssessment(assessmentData) {
     console.log('ADAPTIVE_ROUTER: Iniciando roteamento automático');
 
-    const adaptationDetails = parseAdaptationDetails(state.currentStudent.adaptationDetails);
+    // USA A FUNÇÃO CENTRALIZADA PARA PARSE
+    const adaptationDetailsObject = parseAdaptationDetails(state.currentStudent.adaptationDetails);
 
-    if (!adaptationDetails) {
+    if (!adaptationDetailsObject) {
         console.log('ADAPTIVE_ROUTER: Estudante sem necessidades especiais, usando avaliação padrão');
         return startStandardAssessment(assessmentData);
     }
 
-    console.log('ADAPTIVE_ROUTER: Estudante com necessidades especiais detectado:', adaptationDetails);
+    console.log('ADAPTIVE_ROUTER: Estudante com necessidades especiais detectado:', adaptationDetailsObject);
 
-    // Determina automaticamente a melhor atividade
-    const adaptationType = determineAdaptationType(adaptationDetails);
-    const optimalActivityType = determineOptimalActivityType(adaptationDetails, adaptationType);
+    // USA A FUNÇÃO CENTRALIZADA PARA DETERMINAR O TIPO
+    const adaptationType = determineAdaptationType(adaptationDetailsObject);
+    const optimalActivityType = determineOptimalActivityType(adaptationDetailsObject, adaptationType);
 
     console.log('ADAPTIVE_ROUTER: Atividade ótima determinada:', optimalActivityType);
 
     // Inicia automaticamente a atividade adequada
-    await startOptimalActivity(optimalActivityType, adaptationDetails, assessmentData);
-}
-
-/**
- * Determina o tipo de adaptação necessária
- */
-export function determineAdaptationType(adaptationDetails) {
-    if (!adaptationDetails?.originalData) return 'intellectual';
-
-    const diagnosis = adaptationDetails.originalData.diagnosis?.join(' ').toLowerCase() || '';
-    const difficulties = adaptationDetails.originalData.difficulties?.join(' ').toLowerCase() || '';
-    const suggestions = adaptationDetails.originalData.suggestions?.join(' ').toLowerCase() || '';
-
-    const allText = `${diagnosis} ${difficulties} ${suggestions}`;
-
-    if (allText.includes('tea') || allText.includes('autis')) return 'tea';
-    if (allText.includes('tdah') || allText.includes('déficit') || allText.includes('hiperativ')) return 'tdah';
-    if (allText.includes('síndrome de down') || allText.includes('down')) return 'down';
-    if (allText.includes('visual') || allText.includes('visão') || allText.includes('cegueira')) return 'visual';
-    if (allText.includes('motor') || allText.includes('física') || allText.includes('coordenação')) return 'motor';
-
-    return 'intellectual';
+    await startOptimalActivity(optimalActivityType, adaptationDetailsObject, assessmentData);
 }
 
 /**
  * Determina a atividade ótima baseada em pesquisa pedagógica
+ * (Esta função permanece aqui, pois é específica do roteamento)
  */
 export function determineOptimalActivityType(adaptationDetails, adaptationType) {
     console.log('SMART_ROUTING: Determinando atividade ótima para:', adaptationType);
@@ -138,7 +121,7 @@ export async function startAdaptiveGame(adaptationDetails, gameType = 'auto') {
         console.log('ADAPTIVE_GAMES: Dados carregados do banco:', gameData.length, 'jogos');
 
         if (gameType === 'auto') {
-            gameType = determineOptimalGameType(adaptationDetails);
+            gameType = determineOptimalActivityType(adaptationDetails).gameType;
         }
 
         // Aplica estilos específicos do jogo
@@ -184,23 +167,6 @@ function showGameScreen(gameType) {
 }
 
 /**
- * Analisa dados de adaptação do JSON
- */
-function parseAdaptationDetails(adaptationDetails) {
-    if (!adaptationDetails) return null;
-
-    try {
-        if (typeof adaptationDetails === 'string') {
-            return JSON.parse(adaptationDetails);
-        }
-        return adaptationDetails;
-    } catch (error) {
-        console.warn('Erro ao analisar detalhes de adaptação:', error);
-        return null;
-    }
-}
-
-/**
  * Aplica customizações de interface baseadas na adaptação
  */
 function applyInterfaceCustomizations(adaptationDetails) {
@@ -235,19 +201,10 @@ function startDragDropAssessment(adaptationDetails) {
     console.log('Iniciando drag and drop');
 }
 
-function determineOptimalGameType(adaptationDetails) {
-    const adaptationType = determineAdaptationType(adaptationDetails);
-    const preferences = {
-        'tea': 'sequence',
-        'tdah': 'matching_speed',
-        'down': 'memory_enhanced',
-        'intellectual': 'classification',
-        'visual': 'audio_memory',
-        'motor': 'click_sequence'
-    };
-    return preferences[adaptationType] || 'memory';
-}
-
 function startAdaptiveGameFallback(adaptationDetails, gameType) {
     console.log('Usando fallback para jogo:', gameType);
 }
+
+// --- FUNÇÕES REMOVIDAS ---
+// A função determineAdaptationType foi movida para adaptiveUtils.js
+// A função parseAdaptationDetails foi movida para adaptiveUtils.js

@@ -261,12 +261,90 @@ export async function finishAssessment() {
     showScreen('results');
     dom.results.saveStatus.textContent = 'Salvando resultado...';
 
-    const saveResult = await saveSubmission(submissionData);
+    // Verifica se está em modo offline standalone (HTML gerado)
+    const isOfflineMode = window.IS_OFFLINE_MODE === true;
+    let saveResult;
+
+    if (isOfflineMode) {
+        // Modo offline: tenta enviar ao servidor local via rede
+        saveResult = await saveSubmissionOffline(submissionData);
+    } else {
+        // Modo online normal: usa o sistema padrão
+        saveResult = await saveSubmission(submissionData);
+    }
+
     displaySaveResult(saveResult);
 
     // Bloqueia o dispositivo apenas se o salvamento (online ou offline) foi bem-sucedido
     if (saveResult.success) {
         localStorage.setItem('deviceLocked', 'true');
+    }
+}
+
+/**
+ * Salva submissão em modo offline (envia para servidor local via rede)
+ * @param {Object} submissionData - Dados da submissão
+ * @returns {Promise<Object>} - Resultado do salvamento
+ */
+async function saveSubmissionOffline(submissionData) {
+    try {
+        // Tenta importar o serviço de submissão offline
+        if (window.offlineSubmissionService) {
+            return await window.offlineSubmissionService.submitToServer(submissionData);
+        }
+
+        // Fallback: salva localmente se o serviço não estiver disponível
+        logService.warn('Serviço de submissão offline não disponível. Usando fallback.');
+        return saveToLocalStorageFallback(submissionData);
+
+    } catch (error) {
+        logService.error('Erro ao salvar resultado offline', { error });
+        return saveToLocalStorageFallback(submissionData);
+    }
+}
+
+/**
+ * Fallback para salvar no localStorage
+ * @param {Object} submissionData - Dados da submissão
+ * @returns {Object} - Resultado do salvamento
+ */
+function saveToLocalStorageFallback(submissionData) {
+    try {
+        const localResults = JSON.parse(localStorage.getItem('pending_results') || '[]');
+
+        const isDuplicate = localResults.some(r =>
+            r.studentId === submissionData.studentId &&
+            r.assessmentId === submissionData.assessmentId
+        );
+
+        if (isDuplicate) {
+            return {
+                success: false,
+                synced: false,
+                error: 'duplicate_local'
+            };
+        }
+
+        localResults.push({
+            ...submissionData,
+            localTimestamp: new Date().toISOString()
+        });
+
+        localStorage.setItem('pending_results', JSON.stringify(localResults));
+
+        return {
+            success: true,
+            synced: false,
+            error: 'offline'
+        };
+
+    } catch (error) {
+        logService.critical('Falha no fallback localStorage', { error });
+        return {
+            success: false,
+            synced: false,
+            error: 'storage_failed'
+        };
     }
 }
 

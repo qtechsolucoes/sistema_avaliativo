@@ -1,45 +1,25 @@
-// src/teacher/offlineGenerator.js - VERSÃO CORRIGIDA E ROBUSTA
+// src/teacher/offlineGenerator.js - VERSÃO ATUALIZADA E ROBUSTA
 
 import { getDataForOfflineFile } from '../database.js';
 import { logService } from '../services/logService.js';
 
-// Ordem correta de "compilação" dos scripts para o modo offline.
-// Arquivos sem dependências vêm primeiro.
-const SCRIPT_LOAD_ORDER = [
-    'src/services/logService.js',
-    'src/state.js',
-    'src/navigation.js',
-    'src/utils/validators.js',
-    'src/services/supabaseClient.js', // Precisa ser definido antes do database
-    'src/services/mockDataService.js',
-    'src/database.js',
-    'src/services/cacheService.js',
-    'src/services/classService.js',
-    'src/services/studentService.js',
-    'src/ui.js',
-    'src/quiz.js',
-    'src/adaptation.js',
-    'src/login.js',
-    'src/teacher/teacherAuth.js',
-    'src/teacher/dataSync.js',
-    'src/teacher/dashboard/dashboardData.js',
-    'src/teacher/dashboard/dashboardCharts.js',
-    'src/teacher/dashboard/dashboardTable.js',
-    'src/teacher/dashboard/dashboardFilters.js',
-    'src/teacher/dashboard/index.js',
-    'src/teacher/index.js',
-    'src/utils/errorHandler.js',
-    'src/main.js' // Main.js por último, pois ele inicializa tudo
-];
-
+/**
+ * Ponto de entrada para gerar o arquivo offline.
+ * @param {HTMLElement} statusElement - Elemento para exibir o status.
+ * @param {HTMLButtonElement} buttonElement - Botão que iniciou a ação.
+ */
 export async function generateOfflineFile(statusElement, buttonElement) {
-    if (!confirm("Esta operação irá gerar um arquivo HTML completo para uso offline. Deseja continuar?")) {
+    if (!confirm("Esta operação irá gerar um arquivo HTML completo para uso offline, contendo todos os dados necessários. Deseja continuar?")) {
         return;
     }
     const generator = new OfflineFileGenerator(statusElement, buttonElement);
     await generator.generate();
 }
 
+/**
+ * Classe responsável por gerar um arquivo HTML autônomo.
+ * NOVA LÓGICA: Lê dinamicamente os scripts do index.html em vez de usar uma lista manual.
+ */
 class OfflineFileGenerator {
     constructor(statusElement, buttonElement) {
         this.statusElement = statusElement;
@@ -48,22 +28,28 @@ class OfflineFileGenerator {
 
     async generate() {
         this.buttonElement.disabled = true;
-        this.updateStatus('Iniciando...', '#64748b');
+        this.updateStatus('Iniciando processo...', '#64748b');
 
         try {
-            // 1. Buscar todos os dados do banco
-            this.updateStatus('Coletando dados do servidor...');
+            // Passo 1: Carregar o HTML principal para análise
+            this.updateStatus('1/4: Analisando a estrutura da aplicação...');
+            const mainHtmlContent = await fetch('/index.html').then(res => res.text());
+            const parser = new DOMParser();
+            const mainDoc = parser.parseFromString(mainHtmlContent, 'text/html');
+
+            // Passo 2: Carregar dinamicamente todos os scripts e CSS referenciados no HTML
+            this.updateStatus('2/4: Carregando todos os arquivos (JS e CSS)...');
+            const assets = await this.loadAssets(mainDoc);
+
+            // Passo 3: Buscar todos os dados necessários do banco
+            this.updateStatus('3/4: Coletando dados do servidor...');
             const serverData = await getDataForOfflineFile();
 
-            // 2. Buscar todos os templates (HTML, CSS, JS)
-            this.updateStatus('Carregando arquivos da aplicação...');
-            const templates = await this.loadTemplates();
+            // Passo 4: Construir o arquivo HTML final
+            this.updateStatus('4/4: Compilando o arquivo final...');
+            const finalHTML = this.buildFinalHTML(mainDoc, assets, serverData);
 
-            // 3. Juntar tudo em um único arquivo HTML
-            this.updateStatus('Compilando arquivo final...');
-            const finalHTML = this.buildFinalHTML(templates, serverData);
-
-            // 4. Iniciar o download
+            // Iniciar o download
             this.downloadFile(finalHTML);
             this.showSuccess(serverData);
 
@@ -72,83 +58,136 @@ class OfflineFileGenerator {
             logService.critical('Falha ao gerar arquivo offline.', { error });
         } finally {
             this.buttonElement.disabled = false;
-            setTimeout(() => this.clearStatus(), 7000);
+            setTimeout(() => this.clearStatus(), 10000);
         }
     }
 
-    async loadTemplates() {
-        // Carrega o conteúdo de todos os arquivos JS em paralelo
-        const scriptPromises = SCRIPT_LOAD_ORDER.map(path =>
-            fetch(`/${path}`)
-            .then(res => {
-                if (!res.ok) throw new Error(`Falha ao carregar ${path}`);
-                return res.text();
-            })
+    /**
+     * Carrega todos os assets (JS, CSS) referenciados no documento HTML.
+     * @param {Document} doc - O documento HTML parseado.
+     * @returns {Promise<object>} Um objeto contendo o conteúdo dos assets.
+     */
+    async loadAssets(doc) {
+        const scriptTags = Array.from(doc.querySelectorAll('script[src]'));
+        const cssLinks = Array.from(doc.querySelectorAll('link[rel="stylesheet"][href]'));
+
+        const scriptPromises = scriptTags.map(tag =>
+            fetch(tag.src).then(res => res.text()).catch(e => `/* Falha ao carregar ${tag.src} */`)
+        );
+        const cssPromises = cssLinks.map(link =>
+            fetch(link.href).then(res => res.text()).catch(e => `/* Falha ao carregar ${link.href} */`)
         );
 
-        // Carrega HTML e CSS
-        const htmlPromise = fetch('/index.html').then(res => res.text());
-        const cssPromise = fetch('/styles/main.css').then(res => res.text());
+        // Carrega também os arquivos de configuração offline
+        const offlineConfigPromise = fetch('/offline-config.js')
+            .then(res => res.text())
+            .catch(() => '// Configuração offline não encontrada');
 
-        const [html, css, ...scripts] = await Promise.all([htmlPromise, cssPromise, ...scriptPromises]);
+        const offlineSubmissionServicePromise = fetch('/src/services/offlineSubmissionService.js')
+            .then(res => res.text())
+            .catch(() => '// Serviço de submissão offline não encontrado');
 
-        // Mapeia os scripts de volta para seus nomes de arquivo
-        const scriptContents = SCRIPT_LOAD_ORDER.reduce((acc, path, index) => {
-            acc[path] = scripts[index];
-            return acc;
-        }, {});
+        const [scripts, css, offlineConfig, offlineService] = await Promise.all([
+            Promise.all(scriptPromises),
+            Promise.all(cssPromises),
+            offlineConfigPromise,
+            offlineSubmissionServicePromise
+        ]);
 
-        return { html, css, scripts: scriptContents };
+        return {
+            scripts: scripts.join('\n\n// --- Fim do Arquivo --- \n\n'),
+            css: css.join('\n\n'),
+            offlineConfig: offlineConfig,
+            offlineSubmissionService: offlineService
+        };
     }
 
-    buildFinalHTML(templates, serverData) {
-        // Remove todos os "import" e "export" do código JS
-        let combinedJs = SCRIPT_LOAD_ORDER.map(path => {
-            const content = templates.scripts[path];
-            return content
-                .replace(/^import .* from '.*';/gm, '') // Remove imports
-                .replace(/^export /gm, ''); // Remove exports
-        }).join('\n\n// --- Fim do Arquivo --- \n\n');
+    /**
+     * Constrói o HTML final injetando CSS, dados e o script compilado.
+     * @param {Document} doc - O documento HTML original parseado.
+     * @param {object} assets - O conteúdo do CSS e JS.
+     * @param {object} serverData - Os dados do banco de dados.
+     * @returns {string} O conteúdo HTML final como string.
+     */
+    buildFinalHTML(doc, assets, serverData) {
+        // Remove os links de script e CSS originais
+        doc.querySelectorAll('script[src], link[rel="stylesheet"]').forEach(el => el.remove());
 
-        // Cria o script que será injetado no HTML
+        // Remove a área de professor, que não é necessária para o aluno
+        const teacherElements = ['#teacher-area-screen', '#teacher-dashboard', '#teacher-login-link'];
+        teacherElements.forEach(selector => {
+            const el = doc.querySelector(selector);
+            if (el) el.remove();
+        });
+
+        // Remove links para CDNs de ícones, pois não funcionarão offline
+        doc.querySelectorAll('script[src*="heroicons"]').forEach(el => el.remove());
+        
+        // Remove "defer" do script principal para garantir execução na ordem
+        const mainScriptTag = doc.getElementById('main-script');
+        if(mainScriptTag) mainScriptTag.removeAttribute('defer');
+
+        // Cria o script que será injetado
         const injectedJS = `
 document.addEventListener('DOMContentLoaded', () => {
+    // --- CONFIGURAÇÃO DO SERVIDOR LOCAL ---
+    ${assets.offlineConfig}
+
     // --- DADOS EMBUTIDOS DO SERVIDOR ---
+    // Estes dados simulam a resposta do banco de dados para o modo offline.
     const OFFLINE_DATA = ${JSON.stringify(serverData)};
     window.IS_OFFLINE_MODE = true;
     console.log('--- MODO OFFLINE ATIVADO ---', {
         alunos: OFFLINE_DATA.students.length,
-        avaliacoes: OFFLINE_DATA.assessments.length
+        avaliacoes: OFFLINE_DATA.assessments.length,
+        servidor: window.OFFLINE_SERVER_CONFIG?.serverURL || 'Não configurado'
     });
 
-    // --- CÓDIGO COMPILADO DA APLICAÇÃO ---
+    // --- SERVIÇO DE SUBMISSÃO OFFLINE ---
     try {
-        ${combinedJs}
+        ${assets.offlineSubmissionService.replace(/^import .* from '.*';/gm, '').replace(/^export /gm, '')}
+
+        // Instancia o serviço globalmente para uso no quiz.js
+        window.offlineSubmissionService = new OfflineSubmissionService();
+
+        // Testa conectividade com o servidor ao iniciar
+        window.offlineSubmissionService.checkServerStatus().then(isOnline => {
+            if (isOnline) {
+                console.log('✅ Servidor local detectado e acessível');
+            } else {
+                console.warn('⚠️ Servidor local não acessível. Resultados serão salvos localmente.');
+            }
+        });
+    } catch (e) {
+        console.warn('Serviço de submissão offline não disponível:', e.message);
+    }
+
+    // --- CÓDIGO COMPILADO DA APLICAÇÃO ---
+    // Todo o código JavaScript da aplicação é combinado aqui.
+    try {
+        // Remove imports/exports, que não funcionam em um script único
+        const combinedJs = \`${assets.scripts}\`
+            .replace(/^import .* from '.*';/gm, '')
+            .replace(/^export /gm, '');
+
+        // Executa o código combinado
+        (new Function(combinedJs))();
     } catch (e) {
         console.error('Erro ao executar o script offline compilado:', e);
-        document.body.innerHTML = '<h1>Erro crítico ao carregar a aplicação offline.</h1>';
+        document.body.innerHTML = '<h1>Erro crítico ao carregar a aplicação offline. Verifique o console.</h1><pre>' + e.stack + '</pre>';
     }
 });
         `;
 
-        let html = templates.html;
+        // Injeta o CSS inline dentro do <head>
+        const styleTag = doc.createElement('style');
+        styleTag.textContent = assets.css;
+        doc.head.appendChild(styleTag);
 
-        // Injeta o CSS inline
-        html = html.replace('<link rel="stylesheet" href="styles/main.css">', `<style>${templates.css}</style>`);
-        
-        // Substitui o script original pelo nosso script compilado e com dados
-        // Usamos um ID para encontrar o script e substituí-lo
-        html = html.replace(
-            '<script type="module" src="src/main.js" id="main-script"></script>',
-            `<script>${injectedJS}</script>`
-        );
-
-        // Removemos elementos de professor
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        ['#teacher-area-screen', '#teacher-dashboard', '#teacher-login-link'].forEach(sel => {
-            const el = doc.querySelector(sel);
-            if (el) el.remove();
-        });
+        // Injeta o JS combinado com os dados no final do <body>
+        const scriptTag = doc.createElement('script');
+        scriptTag.textContent = injectedJS;
+        doc.body.appendChild(scriptTag);
 
         return doc.documentElement.outerHTML;
     }
@@ -163,10 +202,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
     }
-    
-    // Funções de feedback
+
+    // Funções de feedback na UI
     updateStatus(message, color) { this.statusElement.textContent = message; this.statusElement.style.color = color; }
-    showSuccess(data) { this.updateStatus(`Sucesso! Arquivo gerado com ${data.students.length} alunos.`, 'green'); }
+    showSuccess(data) { this.updateStatus(`Sucesso! Arquivo gerado com ${data.students.length} alunos e ${data.assessments.length} avaliações.`, 'green'); }
     showError(error) { this.updateStatus(`Erro: ${error.message}`, 'red'); }
     clearStatus() { this.updateStatus('', ''); }
 }

@@ -1,0 +1,23 @@
+{
+  "name": "sistema-avaliativo",
+  "version": "2.0.0",
+  "description": "Sistema de avaliações offline com envio via rede local",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "servidor": "node server.js",
+    "importar": "node importador-lote.js",
+    "dev": "python -m http.server 8000"
+  },
+  "keywords": [
+    "avaliacao",
+    "educacao",
+    "offline",
+    "chromebook"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
