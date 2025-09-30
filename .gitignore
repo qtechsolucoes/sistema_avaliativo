@@ -7,6 +7,8 @@ src/config.js
 
 # Pasta de dependências (boa prática para o futuro)
 node_modules/
+docs/
+database/
 
 # Pasta de arquivos gerados (boa prática para o futuro)
 dist/
