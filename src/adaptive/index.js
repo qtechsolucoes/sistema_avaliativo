@@ -1,12 +1,14 @@
 // src/adaptive/index.js
 // Módulo Principal do Sistema Adaptativo
 
-// Exporta principais funções do roteador
+// Exporta as funções que realmente estão no roteador
 export {
     routeAssessment,
-    startAdaptiveGame,
-    determineAdaptationType
+    startAdaptiveGame
 } from './core/router.js';
+
+// CORREÇÃO: Importa a função do local correto (adaptiveUtils.js) e a exporta
+export { determineAdaptationType } from './core/adaptiveUtils.js';
 
 // Exporta o gerenciador de jogos
 export { AdaptiveGameManager } from './core/gameManager.js';
