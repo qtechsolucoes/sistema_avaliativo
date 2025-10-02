@@ -4,7 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plataforma de Avaliações</title>
-    
+
+    <!--
+    ⚠️⚠️⚠️ ATENÇÃO ⚠️⚠️⚠️
+
+    NÃO ABRA ESTE ARQUIVO DIRETAMENTE (duplo clique)!
+
+    Isso causará erro 404 em config.js porque módulos ES6
+    não funcionam com protocolo file://
+
+    PARA USAR:
+    1. Abra o terminal nesta pasta
+    2. Execute: python -m http.server 8000
+    3. Acesse: http://localhost:8000
+
+    OU para Chromebooks:
+    - Deploy online (Vercel/Netlify)
+    - Veja: CHROMEBOOKS_SOLUCAO_RAPIDA.txt
+
+    ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+    -->
+
     <!-- CDNs Externos -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -858,5 +878,148 @@
 
     <!-- Script principal da aplicação -->
     <script type="module" src="src/main.js" id="main-script"></script>
+
+    <!-- Detector de erro de protocolo file:// -->
+    <script>
+        // Detecta se está usando file:// e mostra aviso
+        window.addEventListener('error', function(e) {
+            if (e.message && e.message.includes('Failed to load module script')) {
+                document.body.innerHTML = `
+                    <div style="
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-family: system-ui, -apple-system, sans-serif;
+                        padding: 20px;
+                        z-index: 999999;
+                    ">
+                        <div style="
+                            background: white;
+                            padding: 40px;
+                            border-radius: 20px;
+                            max-width: 600px;
+                            text-align: center;
+                            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                        ">
+                            <div style="font-size: 80px; margin-bottom: 20px;">⚠️</div>
+                            <h1 style="color: #e53e3e; font-size: 32px; margin-bottom: 20px; font-weight: bold;">
+                                ERRO: Arquivo Aberto Incorretamente
+                            </h1>
+                            <p style="color: #4a5568; font-size: 18px; margin-bottom: 30px; line-height: 1.6;">
+                                Você abriu o <code style="background: #f7fafc; padding: 4px 8px; border-radius: 4px; color: #e53e3e;">index.html</code>
+                                diretamente (duplo clique).
+                                <br><br>
+                                Isso não funciona porque o sistema usa módulos ES6 que são bloqueados no protocolo <code style="background: #f7fafc; padding: 4px 8px; border-radius: 4px; color: #e53e3e;">file://</code>
+                            </p>
+
+                            <div style="background: #edf2f7; padding: 20px; border-radius: 10px; margin-bottom: 30px; text-align: left;">
+                                <h3 style="color: #2d3748; font-size: 20px; margin-bottom: 15px; font-weight: bold;">
+                                    ✅ Solução Rápida:
+                                </h3>
+                                <ol style="color: #4a5568; font-size: 16px; line-height: 2; margin-left: 20px;">
+                                    <li><strong>Feche esta janela</strong></li>
+                                    <li>Duplo clique em: <code style="background: white; padding: 4px 8px; border-radius: 4px; color: #667eea; font-weight: bold;">INICIAR_SISTEMA.bat</code></li>
+                                    <li>Acesse: <code style="background: white; padding: 4px 8px; border-radius: 4px; color: #667eea; font-weight: bold;">http://localhost:8000</code></li>
+                                </ol>
+                            </div>
+
+                            <div style="background: #fff5f5; border: 2px solid #feb2b2; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                                <h3 style="color: #c53030; font-size: 16px; margin-bottom: 10px; font-weight: bold;">
+                                    📱 Para Chromebooks:
+                                </h3>
+                                <p style="color: #742a2a; font-size: 14px; line-height: 1.5;">
+                                    Chromebooks precisam do sistema hospedado online.<br>
+                                    Leia: <strong>CHROMEBOOKS_SOLUCAO_RAPIDA.txt</strong>
+                                </p>
+                            </div>
+
+                            <button onclick="location.reload()" style="
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                color: white;
+                                border: none;
+                                padding: 15px 40px;
+                                font-size: 18px;
+                                border-radius: 10px;
+                                cursor: pointer;
+                                font-weight: bold;
+                                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                                🔄 Recarregar (após iniciar servidor)
+                            </button>
+
+                            <p style="color: #a0aec0; font-size: 12px; margin-top: 20px;">
+                                Erro: ${e.message}
+                            </p>
+                        </div>
+                    </div>
+                `;
+                e.preventDefault();
+            }
+        }, true);
+
+        // Também detecta se está usando file://
+        if (window.location.protocol === 'file:') {
+            setTimeout(() => {
+                if (!document.querySelector('#login-screen')) { // Se não carregou o sistema
+                    document.body.innerHTML = `
+                        <div style="
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            right: 0;
+                            bottom: 0;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-family: system-ui, -apple-system, sans-serif;
+                            padding: 20px;
+                        ">
+                            <div style="
+                                background: white;
+                                padding: 40px;
+                                border-radius: 20px;
+                                max-width: 600px;
+                                text-align: center;
+                                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                            ">
+                                <div style="font-size: 80px; margin-bottom: 20px;">⚠️</div>
+                                <h1 style="color: #e53e3e; font-size: 28px; margin-bottom: 20px; font-weight: bold;">
+                                    Sistema Não Pode Ser Aberto Diretamente
+                                </h1>
+                                <p style="color: #4a5568; font-size: 16px; margin-bottom: 30px; line-height: 1.6;">
+                                    Você precisa usar um servidor web local ou hospedar online.
+                                </p>
+                                <div style="background: #edf2f7; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: left;">
+                                    <h3 style="color: #2d3748; font-size: 18px; margin-bottom: 15px; font-weight: bold;">
+                                        💻 No seu computador:
+                                    </h3>
+                                    <p style="color: #4a5568; font-size: 14px; line-height: 1.8;">
+                                        Duplo clique em: <code style="background: white; padding: 4px 8px; border-radius: 4px; color: #667eea; font-weight: bold;">INICIAR_SISTEMA.bat</code>
+                                        <br>Depois acesse: <code style="background: white; padding: 4px 8px; border-radius: 4px; color: #667eea; font-weight: bold;">http://localhost:8000</code>
+                                    </p>
+                                </div>
+                                <div style="background: #fffaf0; padding: 20px; border-radius: 10px; text-align: left;">
+                                    <h3 style="color: #c05621; font-size: 18px; margin-bottom: 15px; font-weight: bold;">
+                                        📱 Para Chromebooks:
+                                    </h3>
+                                    <p style="color: #744210; font-size: 14px; line-height: 1.8;">
+                                        Duplo clique em: <code style="background: white; padding: 4px 8px; border-radius: 4px; color: #c05621; font-weight: bold;">DEPLOY_RAPIDO.bat</code>
+                                        <br>Ou leia: <strong>CHROMEBOOKS_SOLUCAO_RAPIDA.txt</strong>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }, 1000);
+        }
+    </script>
 </body>
 </html>
