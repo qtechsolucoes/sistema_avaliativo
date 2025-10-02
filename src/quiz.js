@@ -130,7 +130,11 @@ function loadQuestion() {
     try {
         const question = state.currentAssessment.questions[state.currentQuestionIndex];
 
-        updateState({ questionStartTime: Date.now() });
+        updateState({
+            questionStartTime: Date.now(),
+            hasReadText: false, // Flag para controlar leitura do texto
+            hasAnswered: false  // Flag para controlar se já respondeu
+        });
 
         // Atualiza UI de forma segura
         HTMLSanitizer.setSafeText(dom.quiz.progress, `Pergunta ${state.currentQuestionIndex + 1} de ${state.currentAssessment.questions.length}`);
@@ -138,7 +142,7 @@ function loadQuestion() {
         HTMLSanitizer.setSafeHTML(dom.quiz.baseTextDesktop, state.currentAssessment.baseText || '');
         HTMLSanitizer.setSafeHTML(dom.quiz.baseTextMobile, state.currentAssessment.baseText || '');
 
-        // Inicializa controles de scroll do texto
+        // Inicializa controles de scroll do texto + validação de leitura
         initializeTextScrollControls();
         HTMLSanitizer.setSafeText(dom.quiz.feedback, '');
         dom.quiz.nextBtn.classList.add('hidden');
@@ -147,23 +151,29 @@ function loadQuestion() {
         dom.quiz.optionsContainer.innerHTML = '';
         question.options.forEach(option => {
             const button = HTMLSanitizer.createSafeElement('button', option.text, 'option-btn');
-            button.addEventListener('click', () => selectAnswer(button, option.isCorrect, question.id));
+            button.addEventListener('click', () => {
+                // Valida se o aluno leu o texto antes de permitir responder
+                if (!state.hasReadText) {
+                    showReadingWarning();
+                    return;
+                }
+                selectAnswer(button, option.isCorrect, question.id);
+            });
             dom.quiz.optionsContainer.appendChild(button);
         });
 
-        // Inicia timer de 3 minutos para a questão
+        // Inicia timer de 3 minutos (APENAS informativo, não bloqueia)
         startQuestionTimer({
             minTime: 180, // 3 minutos em segundos
             onUnblock: () => {
-                // Quando desbloquear, habilita o botão se já tiver respondido
-                if (!dom.quiz.nextBtn.classList.contains('hidden')) {
-                    dom.quiz.nextBtn.disabled = false;
-                }
+                // Timer desbloqueado - mostra mensagem motivacional
+                logService.info('3 minutos completados - aluno pode avançar quando quiser');
             }
         });
 
-        // Bloqueia o botão "Próxima" inicialmente
-        dom.quiz.nextBtn.disabled = true;
+        // Botão "Próxima" sempre fica escondido até responder
+        // NÃO É MAIS BLOQUEADO PELO TIMER
+        dom.quiz.nextBtn.disabled = false;
 
     } catch (error) {
         logService.critical('Falha ao carregar a questão.', { questionIndex: state.currentQuestionIndex, error });
@@ -457,31 +467,194 @@ function showErrorOnLogin(message) {
  * Inicializa os listeners de eventos para a tela do quiz.
  */
 /**
- * Inicializa os controles de scroll do texto de apoio
+ * Mostra aviso quando aluno tenta responder sem ler o texto
+ */
+function showReadingWarning() {
+    // Remove aviso anterior se existir
+    const existingWarning = document.getElementById('reading-warning');
+    if (existingWarning) {
+        existingWarning.remove();
+    }
+
+    // Cria overlay de aviso
+    const overlay = document.createElement('div');
+    overlay.id = 'reading-warning';
+    overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    overlay.style.animation = 'fadeIn 0.3s ease-in-out';
+
+    // Modal de aviso
+    const modal = document.createElement('div');
+    modal.className = 'bg-yellow-50 border-4 border-yellow-400 rounded-2xl p-8 max-w-md mx-4 shadow-2xl';
+    modal.style.animation = 'bounceIn 0.5s ease-out';
+
+    // Ícone
+    const icon = document.createElement('div');
+    icon.className = 'text-6xl text-center mb-4';
+    icon.textContent = '📖';
+
+    // Título
+    const title = document.createElement('h3');
+    title.className = 'text-2xl font-bold text-yellow-800 text-center mb-4';
+    title.textContent = 'Leia o texto todo!';
+
+    // Mensagem
+    const message = document.createElement('p');
+    message.className = 'text-lg text-yellow-700 text-center mb-6';
+    message.textContent = 'Você precisa ler o texto até o final antes de responder à questão.';
+
+    // Botão
+    const button = document.createElement('button');
+    button.className = 'w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg text-lg transition-colors';
+    button.textContent = 'Entendi!';
+    button.onclick = () => {
+        overlay.style.animation = 'fadeOut 0.3s ease-in-out';
+        setTimeout(() => overlay.remove(), 300);
+
+        // Destaca o texto de apoio
+        highlightTextContainer();
+    };
+
+    // Monta modal
+    modal.appendChild(icon);
+    modal.appendChild(title);
+    modal.appendChild(message);
+    modal.appendChild(button);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Som de alerta
+    playAlertSound();
+
+    logService.info('Aluno tentou responder sem ler o texto - aviso exibido');
+}
+
+/**
+ * Destaca o container de texto para chamar atenção do aluno
+ */
+function highlightTextContainer() {
+    const textContainer = document.getElementById('text-scroll-container');
+    if (!textContainer) return;
+
+    // Adiciona borda pulsante
+    textContainer.style.border = '4px solid #fbbf24';
+    textContainer.style.animation = 'pulse 1s ease-in-out 3';
+
+    // Remove após 3 segundos
+    setTimeout(() => {
+        textContainer.style.border = '';
+        textContainer.style.animation = '';
+    }, 3000);
+
+    // Scroll suave para o topo do texto
+    textContainer.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+}
+
+/**
+ * Toca som de alerta
+ */
+function playAlertSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.value = 600;
+        oscillator.type = 'sine';
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (error) {
+        logService.warn('Não foi possível reproduzir som de alerta', { error });
+    }
+}
+
+/**
+ * Inicializa os controles de scroll do texto de apoio + validação de leitura
  */
 function initializeTextScrollControls() {
     const textContainer = document.getElementById('text-scroll-container');
     const scrollHint = document.getElementById('scroll-hint');
 
-    if (!textContainer || !scrollHint) return;
+    if (!textContainer) {
+        // Se não há container de texto, marca como "lido" automaticamente
+        updateState({ hasReadText: true });
+        return;
+    }
 
     let scrollInteracted = false;
+
+    // Verifica se o aluno leu até o final
+    function checkIfReadComplete() {
+        const scrollTop = textContainer.scrollTop;
+        const scrollHeight = textContainer.scrollHeight;
+        const clientHeight = textContainer.clientHeight;
+
+        // Considera "lido" se chegou a 90% do final (margem de 10%)
+        const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
+
+        if (scrollPercentage >= 0.9 && !state.hasReadText) {
+            updateState({ hasReadText: true });
+            logService.info('Aluno completou a leitura do texto');
+
+            // Feedback visual - marca como lido
+            showReadingCompleteIndicator();
+        }
+    }
+
+    // Mostra indicador de leitura completa
+    function showReadingCompleteIndicator() {
+        // Remove indicador anterior se existir
+        const existingIndicator = document.getElementById('reading-complete-indicator');
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+
+        const indicator = document.createElement('div');
+        indicator.id = 'reading-complete-indicator';
+        indicator.className = 'fixed top-24 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-40';
+        indicator.style.animation = 'slideInRight 0.5s ease-out';
+        indicator.innerHTML = '✅ Texto lido! Pode responder';
+
+        document.body.appendChild(indicator);
+
+        // Remove após 3 segundos
+        setTimeout(() => {
+            indicator.style.animation = 'fadeOut 0.5s ease-out';
+            setTimeout(() => indicator.remove(), 500);
+        }, 3000);
+    }
 
     // Adiciona indicação visual quando há conteúdo para scrollar
     function checkScrollNeed() {
         const scrollHeight = textContainer.scrollHeight;
         const clientHeight = textContainer.clientHeight;
 
-        if (scrollHeight > clientHeight + 50) { // +50px de margem
+        // Se o texto é curto (não precisa scroll), marca como lido automaticamente
+        if (scrollHeight <= clientHeight + 50) {
+            updateState({ hasReadText: true });
+            if (scrollHint) scrollHint.style.display = 'none';
+            logService.info('Texto curto detectado - marcado como lido automaticamente');
+            return;
+        }
+
+        // Texto longo - exige scroll
+        if (scrollHint) {
             scrollHint.style.display = 'block';
             // Auto-hide a dica após 5 segundos
             setTimeout(() => {
-                if (!scrollInteracted) {
+                if (!scrollInteracted && scrollHint) {
                     scrollHint.style.opacity = '0.5';
                 }
             }, 5000);
-        } else {
-            scrollHint.style.display = 'none';
         }
     }
 
@@ -489,8 +662,11 @@ function initializeTextScrollControls() {
     function handleFirstScroll() {
         if (textContainer.scrollTop > 10 && !scrollInteracted) {
             scrollInteracted = true;
-            scrollHint.style.display = 'none';
+            if (scrollHint) scrollHint.style.display = 'none';
         }
+
+        // Verifica se completou a leitura
+        checkIfReadComplete();
     }
 
     // Event listeners

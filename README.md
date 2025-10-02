@@ -1,239 +1,187 @@
-# 📝 Sistema de Avaliações Educacionais
+# 🎓 Sistema de Avaliações com Servidor Local
 
-Sistema completo de avaliações online/offline para instituições de ensino.
+Sistema de avaliações educacionais otimizado para uso em rede local, com cache inteligente e suporte a conteúdo adaptativo.
 
-## ⚠️ IMPORTANTE - COMO INICIAR
+## ⚡ Início Rápido
 
-**NÃO abra o `index.html` diretamente!** Isso causará erro de conexão com o banco de dados.
-
-### 🚀 Início Rápido (Windows):
-
-1. **Duplo clique em:** `INICIAR_SISTEMA.bat`
-2. **Acesse:** http://localhost:8000
-
-### Ou via terminal:
+### Passo 1: Instalar dependências
 ```bash
-python -m http.server 8000
+npm install
 ```
 
-**📖 Leia:** `COMO_USAR.txt` para instruções detalhadas
-
-## 🚀 Funcionalidades Principais
-
-### Para Alunos
-- ✅ **Login por Ano, Turma e Nome** (sem senha)
-- ✅ **Avaliações de 10 questões aleatórias** selecionadas do banco
-- ✅ **Timer de 3 minutos mínimos** por questão
-- ✅ **Modo Online**: Resultados salvos automaticamente no banco de dados
-- ✅ **Modo Offline**: Download automático de JSON + salvamento no navegador
-- ✅ **Bloqueio automático** após conclusão da prova
-- ✅ **Avaliações adaptativas** para alunos com necessidades especiais
-
-### Para Professores
-- ✅ **Dashboard completo** com gráficos e estatísticas
-- ✅ **Importação de resultados** (JSON individual ou em lote)
-- ✅ **Exportação de dados** para backup
-- ✅ **Desbloqueio de dispositivos** com senha administrativa
-- ✅ **Visualização de desempenho** por turma, aluno e questão
-
-## 📋 Pré-requisitos
-
-- Node.js (v16 ou superior)
-- Conta no Supabase (para modo online)
-- Navegador moderno (Chrome, Edge, Firefox)
-
-## ⚙️ Configuração
-
-### 1. Configurar Variáveis de Ambiente
-
-Crie um arquivo `.env` na raiz do projeto:
-
+### Passo 2: Configurar credenciais
+Crie um arquivo `.env` com suas credenciais do Supabase:
 ```env
 VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_ANON_KEY=sua-chave-anonima
 ```
 
-### 2. Configurar Banco de Dados (Supabase)
-
-1. Acesse seu projeto no Supabase
-2. Execute os scripts SQL na pasta `database/`:
-   - `funcao_submit_assessment_corrigida.sql`
-3. Importe conteúdo adaptativo (opcional):
-   - `adaptive-content-simple.sql` ou
-   - `adaptive-content-system.sql`
-
-### 3. Instalar Dependências
-
-```bash
-npm install
-```
-
-### 4. Iniciar o Servidor
-
-**Desenvolvimento:**
-```bash
-npm run dev
-```
-
-**Produção:**
+### Passo 3: Iniciar o servidor
 ```bash
 npm start
 ```
-
-O sistema estará disponível em `http://localhost:8000`
-
-## 🔧 Configuração para Chromebooks (Modo Offline)
-
-### IP do Servidor Local
-
-Edite o arquivo `scripts/offline-config.js`:
-
-```javascript
-serverIP: "192.168.137.1"  // ⬅️ Altere para o IP do seu computador
-```
-
-**Como descobrir seu IP:**
-
-**Windows:**
-```cmd
-ipconfig
-```
-Procure por "Adaptador de Rede sem Fio" → "Endereço IPv4"
-
-**Mac/Linux:**
+ou execute:
 ```bash
-ifconfig
+INICIAR.bat
 ```
 
-### Iniciar Servidor para Chromebooks
-
-```bash
-npm start
-```
-
-Os Chromebooks devem acessar: `http://IP-DO-SERVIDOR:3000`
-
-## 📤 Importação de Resultados Offline
-
-O professor pode importar resultados de 3 formas:
-
-1. **JSON Individual** (gerado automaticamente pelo aluno):
-   ```json
-   {
-     "studentName": "João Silva",
-     "grade": "9",
-     "className": "A",
-     "score": 8,
-     "totalQuestions": 10,
-     ...
-   }
-   ```
-
-2. **Array de Resultados**:
-   ```json
-   [
-     { "studentId": "...", "score": 8, ... },
-     { "studentId": "...", "score": 9, ... }
-   ]
-   ```
-
-3. **Exportação em Lote** (formato padrão):
-   ```json
-   {
-     "metadata": { "exportDate": "...", "totalResults": 5 },
-     "results": [ ... ]
-   }
-   ```
-
-## 🔒 Segurança
-
-- ✅ Sanitização automática de entradas
-- ✅ Proteção contra XSS
-- ✅ Validação de dados em todas as camadas
-- ✅ Bloqueio de dispositivos após conclusão
-- ✅ Senha administrativa para desbloqueio
-
-## 📊 Estrutura do Projeto
-
-```
-sistema_avaliativo/
-├── src/
-│   ├── adaptive/         # Sistema de avaliações adaptativas
-│   ├── services/         # Serviços (banco, conectividade, logs)
-│   ├── teacher/          # Módulos do professor
-│   ├── utils/            # Utilitários (timer, validação, sanitização)
-│   ├── main.js           # Arquivo principal
-│   ├── quiz.js           # Lógica do quiz
-│   ├── login.js          # Lógica de login
-│   └── database.js       # Interface com banco de dados
-├── scripts/
-│   ├── server.js         # Servidor para modo offline
-│   └── offline-config.js # Configuração do servidor
-├── styles/               # Estilos CSS
-├── docs/                 # Documentação técnica
-├── database/             # Scripts SQL
-└── index.html            # Página principal
-```
-
-## 🎮 Funcionalidades Avançadas
-
-### Avaliações Adaptativas
-
-O sistema detecta automaticamente alunos com necessidades especiais e adapta:
-
-- **TEA (Transtorno do Espectro Autista)**: Interface simplificada
-- **TDAH**: Elementos visuais dinâmicos
-- **Síndrome de Down**: Linguagem simples e reforço positivo
-- **Deficiência Intelectual**: Conteúdo gradual
-- **Deficiência Visual**: Alto contraste e textos grandes
-- **Deficiência Motora**: Botões grandes e tempo extra
-
-### Sistema de Timer
-
-- ⏱️ **3 minutos mínimos** por questão
-- 🔒 Botão "Próxima" bloqueado até completar o tempo
-- 🔔 Avisos sonoros
-- 📊 Barra de progresso visual
-
-### Detecção de Conectividade
-
-O sistema detecta automaticamente se está online ou offline:
-
-- **Online**: Salva direto no Supabase
-- **Offline**:
-  - Gera arquivo JSON automaticamente
-  - Salva backup no localStorage
-  - Exibe mensagem clara para o aluno
-
-## 🐛 Resolução de Problemas
-
-### "Erro ao conectar com Supabase"
-- Verifique as variáveis de ambiente no `.env`
-- Confirme que o projeto Supabase está ativo
-- Teste a conexão em: Settings → API → URL e Keys
-
-### "Arquivo JSON não é importado"
-- Verifique se o JSON tem `studentId` e `assessmentId`
-- Confirme o formato do arquivo
-- Veja logs do navegador (F12 → Console)
-
-### "Timer não aparece"
-- Limpe o cache do navegador (Ctrl+Shift+Del)
-- Verifique se há erros no console
-- Recarregue a página (Ctrl+F5)
-
-## 📞 Suporte
-
-Para questões técnicas, consulte a documentação em:
-- `docs/INSTRUCOES_PRODUCAO.md`
-- `docs/CONFIGURAR_SUPABASE.md`
-- `docs/RESUMO_FINAL.md`
-
-## 📄 Licença
-
-Sistema desenvolvido para uso educacional.
+### Passo 4: Acessar nos Chromebooks
+Acesse `http://192.168.5.1:8000` nos dispositivos conectados à sua rede.
 
 ---
 
-**Versão:** 2.0.1
+## 🌟 Principais Funcionalidades
+
+### ✅ Servidor Local com Cache
+- **Carregamento único:** Dados baixados do Supabase apenas uma vez
+- **Cache em memória:** Acesso instantâneo para todos os alunos
+- **Economia de dados:** Não requer internet individual em cada dispositivo
+- **Correção automática:** Filtra questões pelo ano correto
+
+### 📝 Sistema de Avaliações
+- Interface intuitiva para alunos
+- Questões de múltipla escolha
+- Embaralhamento automático de questões e alternativas
+- Timer por questão (mínimo de 3 minutos)
+- Feedback visual instantâneo
+
+### ♿ Suporte a Conteúdo Adaptativo
+- Textos simplificados para TEA, TDAH e Down
+- Questões adaptadas por nível de dificuldade
+- Jogos educativos interativos
+- Feedback personalizado
+
+### 🔒 Bloqueio de Dispositivos
+- Impede que alunos refaçam a prova
+- Controle centralizado de submissões
+- Desbloqueio via senha administrativa
+
+---
+
+## 📁 Estrutura do Projeto
+
+```
+sistema_avaliativo/
+├── server.js                    # Servidor Node.js com cache
+├── index.html                   # Interface principal
+├── INICIAR.bat                  # Script de inicialização
+├── LIBERAR_FIREWALL.bat         # Configuração do firewall
+├── GUIA_COMPLETO.md             # Documentação completa
+├── src/
+│   ├── main.js                  # Ponto de entrada
+│   ├── quiz.js                  # Lógica da avaliação
+│   ├── services/
+│   │   ├── localServerClient.js # Cliente para API local
+│   │   ├── dataService.js       # Serviço unificado de dados
+│   │   └── supabaseClient.js    # Cliente Supabase (fallback)
+│   ├── adaptive/                # Sistema de conteúdo adaptativo
+│   └── utils/                   # Utilitários diversos
+└── package.json                 # Dependências
+```
+
+---
+
+## 🔧 Modos de Operação
+
+### 1. Servidor Local (RECOMENDADO)
+```bash
+npm start
+```
+- ✅ Dados em cache
+- ✅ Um único download do banco
+- ✅ Acesso rápido para todos
+- ✅ Filtros automáticos de qualidade
+
+### 2. Modo Direto
+```bash
+npm run dev
+```
+- ⚠️ Cada aluno acessa o Supabase
+- ⚠️ Requer internet em todos os dispositivos
+
+---
+
+## 🐛 Solução de Problemas
+
+### Questões incorretas na prova
+**Solução:** O servidor agora filtra automaticamente questões pelo ano correto.
+
+### Chromebooks não conseguem acessar
+1. Execute `LIBERAR_FIREWALL.bat`
+2. Verifique se todos estão na mesma rede WiFi
+3. Teste: `http://192.168.5.1:8000/api/status`
+
+### Cache desatualizado
+Reinicie o servidor com `npm start` para recarregar dados.
+
+---
+
+## 📊 Monitoramento
+
+### Ver status do servidor
+Acesse: `http://192.168.5.1:8000/api/status`
+
+Resposta:
+```json
+{
+  "status": "online",
+  "cacheReady": true,
+  "lastUpdate": "2025-10-02T12:00:00.000Z",
+  "cachedData": {
+    "classes": 12,
+    "students": 350,
+    "assessments": 6
+  }
+}
+```
+
+---
+
+## 🔐 Segurança
+
+- ✅ Cache apenas em memória (não persiste em disco)
+- ✅ Credenciais Supabase ficam no servidor
+- ✅ Chromebooks não têm acesso direto ao banco
+- ✅ Bloqueio automático após conclusão da prova
+
+---
+
+## 📦 Dependências
+
+- **Node.js** ≥ 14.0.0
+- **express** - Servidor HTTP
+- **@supabase/supabase-js** - Cliente Supabase
+- **cors** - Permite requisições cross-origin
+- **dotenv** - Carrega variáveis de ambiente
+
+---
+
+## 🎯 Benefícios
+
+| Característica | Antes | Agora |
+|---|---|---|
+| Carregamento do banco | Por aluno | Uma única vez |
+| Questões incorretas | Podem aparecer | Filtradas automaticamente |
+| Dependência de internet | Todos os dispositivos | Apenas o servidor |
+| Performance | Variável | Consistente e rápida |
+
+---
+
+## 📝 Licença
+
+MIT License - Uso livre para fins educacionais
+
+---
+
+## 🆘 Suporte
+
+Para dúvidas ou problemas:
+1. Consulte `GUIA_COMPLETO.md`
+2. Verifique os logs do servidor no terminal
+3. Teste a rota `/api/status` para diagnóstico
+
+---
+
+**Versão:** 2.1.0
 **Última Atualização:** Outubro 2025
+**Desenvolvido para otimizar a aplicação de avaliações em ambientes educacionais** 🎓

@@ -1,8 +1,9 @@
-// src/services/dataService.js - Serviço de dados unificado
+// src/services/dataService.js - Serviço de dados unificado com suporte a servidor local
 
 import { getSupabaseClient, isSupabaseAvailable, testSupabaseConnection } from './supabaseClient.js';
 import { mockDataService } from './mockDataService.js';
 import { logService } from './logService.js';
+import { localServerClient } from './localServerClient.js';
 
 /**
  * Serviço de dados online (Supabase)
@@ -1153,22 +1154,122 @@ class OfflineDataService {
 }
 
 /**
- * Factory que retorna o serviço apropriado
+ * Serviço de dados com servidor local (modo rede local com cache)
  */
-function createDataService() {
+class LocalServerDataService {
+    constructor() {
+        this.client = localServerClient;
+    }
+
+    async getClassesByGrade(grade) {
+        try {
+            return await this.client.getClassesByGrade(grade);
+        } catch (error) {
+            logService.warn('Servidor local falhou para turmas, usando mock', error);
+            return mockDataService.getClassesByGrade(grade);
+        }
+    }
+
+    async getStudentsByClass(classId) {
+        try {
+            return await this.client.getStudentsByClass(classId);
+        } catch (error) {
+            logService.warn('Servidor local falhou para estudantes, usando mock', error);
+            return mockDataService.getStudentsByClass(classId);
+        }
+    }
+
+    async getAssessmentData(grade, disciplineName = 'Artes') {
+        try {
+            return await this.client.getAssessmentData(grade, disciplineName);
+        } catch (error) {
+            logService.warn('Servidor local falhou para avaliação, usando mock', error);
+            return mockDataService.getAssessmentData(grade, disciplineName);
+        }
+    }
+
+    async saveSubmission(submissionData) {
+        try {
+            return await this.client.saveSubmission(submissionData);
+        } catch (error) {
+            logService.warn('Servidor local falhou para submissão, salvando localmente', error);
+            return mockDataService.saveSubmission(submissionData);
+        }
+    }
+
+    async getCompletedSubmissions(classId) {
+        try {
+            return await this.client.getCompletedSubmissions(classId);
+        } catch (error) {
+            logService.warn('Servidor local falhou para submissões completadas', error);
+            return [];
+        }
+    }
+}
+
+/**
+ * Factory que retorna o serviço apropriado
+ * Prioridade: 1) Servidor Local (cache), 2) Supabase Direto, 3) Offline (mock)
+ */
+async function createDataService() {
+    // Tenta usar servidor local primeiro
+    try {
+        const serverAvailable = await localServerClient.checkAvailability();
+        if (serverAvailable) {
+            logService.info('🚀 Usando LocalServerDataService (servidor com cache)');
+            console.log('✅ MODO OTIMIZADO: Dados vindo do servidor local com cache!');
+            return new LocalServerDataService();
+        }
+    } catch (error) {
+        logService.debug('Servidor local não disponível, tentando Supabase direto', error);
+    }
+
+    // Fallback para Supabase direto
     if (isSupabaseAvailable()) {
-        logService.info('Usando OnlineDataService (Supabase)');
+        logService.info('🌐 Usando OnlineDataService (Supabase direto)');
+        console.log('⚠️ MODO DIRETO: Cada aluno baixa dados individualmente do Supabase');
         return new OnlineDataService(getSupabaseClient());
     } else {
-        logService.info('Usando OfflineDataService (Mock)');
+        logService.info('📴 Usando OfflineDataService (Mock)');
+        console.log('⚠️ MODO OFFLINE: Usando dados de teste');
         return new OfflineDataService();
     }
 }
 
-// Exporta instância singleton
-export const dataService = createDataService();
+// Exporta instância singleton (será criada após o carregamento)
+let dataServiceInstance = null;
+
+// Função assíncrona para obter o serviço
+export async function getDataService() {
+    if (!dataServiceInstance) {
+        dataServiceInstance = await createDataService();
+    }
+    return dataServiceInstance;
+}
+
+// Inicializa o serviço imediatamente
+createDataService().then(service => {
+    dataServiceInstance = service;
+});
+
+// Exporta o serviço (pode ser null inicialmente, mas será preenchido rapidamente)
+export const dataService = new Proxy({}, {
+    get(target, prop) {
+        if (dataServiceInstance) {
+            return dataServiceInstance[prop];
+        }
+        // Enquanto não está pronto, retorna funções que esperam o serviço
+        return async (...args) => {
+            if (!dataServiceInstance) {
+                dataServiceInstance = await createDataService();
+            }
+            return dataServiceInstance[prop](...args);
+        };
+    }
+});
 
 // Função para recriar o serviço (útil para reconexão)
-export function recreateDataService() {
-    return createDataService();
+export async function recreateDataService() {
+    dataServiceInstance = await createDataService();
+    return dataServiceInstance;
 }

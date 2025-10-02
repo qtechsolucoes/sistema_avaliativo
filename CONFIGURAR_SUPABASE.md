@@ -1,13 +1,19 @@
 # 🔑 Guia Rápido - Configurar Supabase
 
+## 🚀 Modo Servidor Local (RECOMENDADO)
+
+O sistema agora usa um **servidor local com cache**. Configure uma vez e todos os alunos acessam sem internet individual!
+
 ## ✅ Variáveis de Ambiente
 
 ### **ESSENCIAIS (Obrigatórias):**
 
 | Variável | Onde Encontrar | Descrição |
 |----------|----------------|-----------|
-| `SUPABASE_URL` | Settings → API → Project URL | URL do seu projeto Supabase |
-| `SUPABASE_ANON_KEY` | Settings → API → anon public | Chave pública/anônima |
+| `VITE_SUPABASE_URL` | Settings → API → Project URL | URL do seu projeto Supabase |
+| `VITE_SUPABASE_ANON_KEY` | Settings → API → anon public | Chave pública/anônima |
+
+> **IMPORTANTE:** Use o prefixo `VITE_` para as variáveis no arquivo `.env`
 
 ### **OPCIONAIS (Avançadas):**
 
@@ -42,14 +48,32 @@
 
 ### 3️⃣ Configurar no Sistema
 
-**Método 1 - Arquivo .env (Produção):**
+**Método 1 - Arquivo .env (RECOMENDADO):**
 ```bash
 1. Copie .env.example para .env
 2. Cole as credenciais:
 
-SUPABASE_URL=https://seu-projeto.supabase.co
-SUPABASE_ANON_KEY=sua-chave-aqui
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-chave-aqui
 ```
+
+### 4️⃣ Iniciar o Servidor Local
+
+**Windows:**
+```bash
+INICIAR.bat
+```
+
+**Ou via terminal:**
+```bash
+npm start
+```
+
+O servidor irá:
+1. ✅ Carregar dados do Supabase **uma única vez**
+2. ✅ Criar cache em memória
+3. ✅ Filtrar questões automaticamente pelo ano correto
+4. ✅ Servir na rede local: `http://192.168.5.1:8000`
 
 **Método 2 - Console do Navegador (Desenvolvimento):**
 ```javascript
