@@ -1,0 +1,100 @@
+═══════════════════════════════════════════════════════════════
+  SISTEMA DE AVALIAÇÕES EDUCACIONAIS - INSTRUÇÕES DE USO
+═══════════════════════════════════════════════════════════════
+
+⚠️  IMPORTANTE: NÃO ABRA O index.html DIRETAMENTE!
+
+Por questões de segurança do navegador, você DEVE usar um servidor local.
+
+═══════════════════════════════════════════════════════════════
+  📋 COMO INICIAR O SISTEMA
+═══════════════════════════════════════════════════════════════
+
+OPÇÃO 1 - Arquivo Batch (MAIS FÁCIL):
+   1. Dê duplo clique em: INICIAR_SISTEMA.bat
+   2. Aguarde abrir uma janela preta (terminal)
+   3. Acesse no navegador: http://localhost:8000
+
+OPÇÃO 2 - Comando Manual (via Terminal):
+   1. Abra o Prompt de Comando (CMD) nesta pasta
+   2. Digite: python -m http.server 8000
+   3. Acesse no navegador: http://localhost:8000
+
+OPÇÃO 3 - Com Node.js:
+   1. Abra o terminal nesta pasta
+   2. Digite: npm run dev
+   3. Acesse no navegador: http://localhost:8000
+
+═══════════════════════════════════════════════════════════════
+  ❌ PROBLEMAS COMUNS
+═══════════════════════════════════════════════════════════════
+
+PROBLEMA: "Não puxa o banco de dados"
+CAUSA: Você abriu o index.html diretamente (file://)
+SOLUÇÃO: Use um dos métodos acima com servidor local
+
+PROBLEMA: "Python não encontrado"
+CAUSA: Python não está instalado
+SOLUÇÃO:
+   1. Baixe em: https://www.python.org/downloads/
+   2. Durante instalação, marque "Add Python to PATH"
+   3. Reinicie o computador
+   4. Tente novamente
+
+PROBLEMA: "Porta 8000 já está em uso"
+CAUSA: Outro programa usando a porta 8000
+SOLUÇÃO:
+   - Método 1: Feche outros servidores
+   - Método 2: Use porta diferente: python -m http.server 3000
+
+PROBLEMA: "Erro ao conectar com Supabase"
+CAUSA: Arquivo .env não configurado
+SOLUÇÃO:
+   1. Renomeie .env.example para .env
+   2. Adicione suas credenciais do Supabase
+   3. Reinicie o servidor
+
+═══════════════════════════════════════════════════════════════
+  🔧 CONFIGURAÇÃO DO SUPABASE
+═══════════════════════════════════════════════════════════════
+
+1. Acesse: https://supabase.com
+2. Crie/acesse seu projeto
+3. Vá em: Settings → API
+4. Copie:
+   - Project URL → VITE_SUPABASE_URL
+   - anon public → VITE_SUPABASE_ANON_KEY
+5. Cole no arquivo .env
+
+═══════════════════════════════════════════════════════════════
+  📱 PARA USAR COM CHROMEBOOKS
+═══════════════════════════════════════════════════════════════
+
+🎯 MODO ONLINE (Com Internet):
+   1. Hospede o sistema online (Vercel/Netlify/GitHub Pages)
+   2. Compartilhe o link com os alunos
+   3. Alunos acessam e fazem a prova
+   4. Resultados salvos automaticamente no Supabase
+
+🔌 MODO OFFLINE (Sem Internet - Rede Local):
+   1. Descubra o IP: CMD → ipconfig → IPv4 (ex: 192.168.137.1)
+   2. Configure: scripts/offline-config.js → serverIP
+   3. Crie Hotspot: Configurações → Hotspot Móvel
+   4. Inicie servidor: npm start
+   5. Alunos conectam no Hotspot
+   6. Alunos acessam: http://192.168.137.1:3000
+   7. JSON baixado automaticamente
+   8. Professor importa os JSONs
+
+📖 GUIA COMPLETO: Leia CHROMEBOOKS_GUIA.md
+
+═══════════════════════════════════════════════════════════════
+  📞 SUPORTE
+═══════════════════════════════════════════════════════════════
+
+Consulte a documentação completa em:
+- README.md (visão geral)
+- docs/INSTRUCOES_PRODUCAO.md (produção)
+- docs/CONFIGURAR_SUPABASE.md (banco de dados)
+
+═══════════════════════════════════════════════════════════════

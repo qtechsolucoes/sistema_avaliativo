@@ -2,6 +2,22 @@
 
 Sistema completo de avaliações online/offline para instituições de ensino.
 
+## ⚠️ IMPORTANTE - COMO INICIAR
+
+**NÃO abra o `index.html` diretamente!** Isso causará erro de conexão com o banco de dados.
+
+### 🚀 Início Rápido (Windows):
+
+1. **Duplo clique em:** `INICIAR_SISTEMA.bat`
+2. **Acesse:** http://localhost:8000
+
+### Ou via terminal:
+```bash
+python -m http.server 8000
+```
+
+**📖 Leia:** `COMO_USAR.txt` para instruções detalhadas
+
 ## 🚀 Funcionalidades Principais
 
 ### Para Alunos
