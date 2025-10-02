@@ -69,8 +69,26 @@ export class DataSync {
             const fileContent = await this.readFile(file);
             const data = JSON.parse(fileContent);
 
-            const resultsToProcess = data.results || (Array.isArray(data) ? data : null);
-            if (!resultsToProcess) {
+            let resultsToProcess = null;
+
+            // Formato 1: Objeto com propriedade 'results' (exportação em lote)
+            if (data.results && Array.isArray(data.results)) {
+                resultsToProcess = data.results;
+            }
+            // Formato 2: Array direto (exportação legada)
+            else if (Array.isArray(data)) {
+                resultsToProcess = data;
+            }
+            // Formato 3: Objeto único (JSON individual gerado automaticamente pelo sistema offline)
+            else if (data.studentId && data.assessmentId) {
+                resultsToProcess = [data]; // Converte para array com um único elemento
+                logService.info('Arquivo JSON individual detectado', {
+                    student: data.studentName,
+                    grade: data.grade
+                });
+            }
+
+            if (!resultsToProcess || resultsToProcess.length === 0) {
                 throw new Error("Formato de arquivo inválido. Nenhum resultado encontrado.");
             }
 

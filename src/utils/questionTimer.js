@@ -47,44 +47,51 @@ export class QuestionTimer {
         const oldTimer = document.getElementById('question-timer-container');
         if (oldTimer) oldTimer.remove();
 
-        // Container principal
+        // Container principal - canto superior direito, fora do conteúdo
         const container = document.createElement('div');
         container.id = 'question-timer-container';
-        container.className = 'fixed top-4 right-4 z-50 bg-white rounded-lg shadow-2xl p-4 border-2 border-gray-200';
-        container.style.minWidth = '280px';
+        container.className = 'fixed top-4 right-4 z-50 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-xl p-3';
+        container.style.minWidth = '160px';
+        container.style.maxWidth = '180px';
 
-        // Ícone de status
-        const statusIcon = document.createElement('div');
+        // Cabeçalho compacto com ícone e tempo na mesma linha
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between mb-2';
+
+        // Ícone de status menor
+        const statusIcon = document.createElement('span');
         statusIcon.id = 'timer-status-icon';
-        statusIcon.className = 'text-4xl text-center mb-2';
+        statusIcon.className = 'text-xl';
         statusIcon.textContent = '🔒';
 
-        // Display do tempo
+        // Display do tempo menor
         const timerDisplay = document.createElement('div');
         timerDisplay.id = 'timer-display';
-        timerDisplay.className = 'text-3xl font-bold text-center mb-2 font-mono';
+        timerDisplay.className = 'text-xl font-bold font-mono text-white';
         timerDisplay.textContent = this.formatTime(0);
 
-        // Mensagem de status
+        header.appendChild(statusIcon);
+        header.appendChild(timerDisplay);
+
+        // Mensagem de status compacta
         const statusMessage = document.createElement('div');
         statusMessage.id = 'timer-status-message';
-        statusMessage.className = 'text-sm text-center text-gray-600 mb-3';
-        statusMessage.textContent = 'Aguarde 3 minutos para avançar';
+        statusMessage.className = 'text-xs text-center text-blue-100 mb-2';
+        statusMessage.textContent = 'Aguarde 3min';
 
-        // Barra de progresso
+        // Barra de progresso menor
         const progressContainer = document.createElement('div');
-        progressContainer.className = 'w-full bg-gray-200 rounded-full h-3 overflow-hidden';
+        progressContainer.className = 'w-full bg-blue-300 bg-opacity-30 rounded-full h-2 overflow-hidden';
 
         const progressBar = document.createElement('div');
         progressBar.id = 'timer-progress-bar';
-        progressBar.className = 'h-full bg-red-500 transition-all duration-1000 ease-linear';
+        progressBar.className = 'h-full bg-white transition-all duration-1000 ease-linear';
         progressBar.style.width = '0%';
 
         progressContainer.appendChild(progressBar);
 
         // Monta estrutura
-        container.appendChild(statusIcon);
-        container.appendChild(timerDisplay);
+        container.appendChild(header);
         container.appendChild(statusMessage);
         container.appendChild(progressContainer);
 
@@ -176,14 +183,14 @@ export class QuestionTimer {
 
         // Atualiza UI
         this.statusIcon.textContent = '✅';
-        this.statusMessage.textContent = 'Você pode avançar para a próxima questão';
-        this.statusMessage.classList.remove('text-gray-600');
-        this.statusMessage.classList.add('text-green-600', 'font-bold');
+        this.statusMessage.textContent = 'Pode avançar!';
+        this.statusMessage.classList.remove('text-blue-100');
+        this.statusMessage.classList.add('text-white', 'font-bold');
 
-        // Efeito de pulso
+        // Muda o fundo para verde e adiciona efeito de pulso
         const container = document.getElementById('question-timer-container');
         if (container) {
-            container.classList.add('animate-pulse');
+            container.className = 'fixed top-4 right-4 z-50 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl shadow-xl p-3 animate-pulse';
             setTimeout(() => container.classList.remove('animate-pulse'), 2000);
         }
 

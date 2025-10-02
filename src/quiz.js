@@ -7,6 +7,8 @@ import { showConfirmationModal, handleVisibilityChange } from './ui.js';
 import { routeAssessment } from './adaptive/index.js';
 import { logService } from './services/logService.js';
 import { HTMLSanitizer } from './utils/sanitizer.js';
+import { connectivityService } from './services/connectivityService.js';
+import { startQuestionTimer, stopQuestionTimer } from './utils/questionTimer.js';
 
 /**
  * Ponto de entrada principal para iniciar o fluxo da avaliação.
@@ -148,6 +150,21 @@ function loadQuestion() {
             button.addEventListener('click', () => selectAnswer(button, option.isCorrect, question.id));
             dom.quiz.optionsContainer.appendChild(button);
         });
+
+        // Inicia timer de 3 minutos para a questão
+        startQuestionTimer({
+            minTime: 180, // 3 minutos em segundos
+            onUnblock: () => {
+                // Quando desbloquear, habilita o botão se já tiver respondido
+                if (!dom.quiz.nextBtn.classList.contains('hidden')) {
+                    dom.quiz.nextBtn.disabled = false;
+                }
+            }
+        });
+
+        // Bloqueia o botão "Próxima" inicialmente
+        dom.quiz.nextBtn.disabled = true;
+
     } catch (error) {
         logService.critical('Falha ao carregar a questão.', { questionIndex: state.currentQuestionIndex, error });
         HTMLSanitizer.setSafeText(dom.quiz.question, 'Erro ao carregar esta questão.');
@@ -229,6 +246,9 @@ export async function finishAssessment() {
     logService.info('Iniciando finalização da avaliação.', { studentId: state.currentStudent.id });
     document.removeEventListener('visibilitychange', handleVisibilityChange);
 
+    // Para e remove o timer
+    stopQuestionTimer();
+
     const totalDuration = Math.round((Date.now() - state.assessmentStartTime) / 1000);
 
     // Debug: Verificar se os IDs estão presentes
@@ -259,23 +279,36 @@ export async function finishAssessment() {
 
     displayFinalScore(submissionData.score, submissionData.totalQuestions);
     showScreen('results');
-    dom.results.saveStatus.textContent = 'Salvando resultado...';
+    dom.results.saveStatus.textContent = 'Verificando conectividade...';
 
-    // Verifica se está em modo offline standalone (HTML gerado)
-    const isOfflineMode = window.IS_OFFLINE_MODE === true;
+    // Usa o serviço de conectividade para detectar automaticamente online/offline
+    const connectivityResult = await connectivityService.saveWithConnectivityDetection(submissionData);
+
     let saveResult;
 
-    if (isOfflineMode) {
-        // Modo offline: tenta enviar ao servidor local via rede
-        saveResult = await saveSubmissionOffline(submissionData);
-    } else {
-        // Modo online normal: usa o sistema padrão
+    if (connectivityResult.mode === 'online') {
+        // Sistema online - salva no banco de dados normalmente
+        dom.results.saveStatus.textContent = 'Salvando no banco de dados...';
         saveResult = await saveSubmission(submissionData);
+    } else {
+        // Sistema offline - já salvou no localStorage e fez download do JSON
+        logService.info('Modo offline detectado - dados salvos localmente e JSON baixado', {
+            localSave: connectivityResult.localSave,
+            download: connectivityResult.download
+        });
+
+        saveResult = {
+            success: connectivityResult.success,
+            synced: false,
+            mode: 'offline',
+            localSave: connectivityResult.localSave,
+            download: connectivityResult.download
+        };
     }
 
     displaySaveResult(saveResult);
 
-    // Bloqueia o dispositivo apenas se o salvamento (online ou offline) foi bem-sucedido
+    // Bloqueia o dispositivo apenas se o salvamento foi bem-sucedido
     if (saveResult.success) {
         localStorage.setItem('deviceLocked', 'true');
     }
@@ -365,8 +398,43 @@ function displaySaveResult(result) {
         dom.results.saveStatus.textContent = "Atenção: Este resultado já foi salvo anteriormente.";
         dom.results.saveStatus.style.color = 'orange';
     } else if (result.success && result.synced) {
-        dom.results.saveStatus.textContent = "Resultado salvo e sincronizado com sucesso!";
+        dom.results.saveStatus.textContent = "✅ Resultado salvo e sincronizado com sucesso!";
         dom.results.saveStatus.style.color = 'green';
+    } else if (result.success && result.mode === 'offline') {
+        // Modo offline com auto-download - mensagem positiva
+        const downloadMsg = result.download?.success
+            ? `<div class="flex items-center gap-2 text-green-700">
+                <span class="text-2xl">✅</span>
+                <span>Arquivo <strong>${result.download.fileName}</strong> baixado com sucesso!</span>
+               </div>`
+            : '<div class="text-orange-600">⚠️ Não foi possível baixar o arquivo automaticamente.</div>';
+
+        const localMsg = result.localSave?.success
+            ? '<div class="text-blue-600 text-sm">💾 Backup salvo no navegador com segurança.</div>'
+            : '';
+
+        dom.results.saveStatus.innerHTML = `
+            <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 space-y-3">
+                <div class="flex items-center gap-3">
+                    <div class="text-4xl">🔌</div>
+                    <div>
+                        <div class="text-xl font-bold text-blue-900">VOCÊ ESTÁ DESCONECTADO</div>
+                        <div class="text-lg font-semibold text-green-700">PROVA EXTRAÍDA COM SUCESSO!</div>
+                    </div>
+                </div>
+                <div class="border-t border-blue-200 pt-3 space-y-2">
+                    ${downloadMsg}
+                    ${localMsg}
+                </div>
+                <div class="bg-yellow-100 border border-yellow-300 rounded p-3 flex items-start gap-2">
+                    <span class="text-xl">📤</span>
+                    <div class="text-sm text-yellow-800">
+                        <strong>Próximo passo:</strong> Entregue o arquivo JSON ao professor para que sua prova seja registrada no sistema.
+                    </div>
+                </div>
+            </div>
+        `;
+        dom.results.saveStatus.style.color = '#1e40af'; // blue-800
     } else if (result.success && !result.synced) {
         dom.results.saveStatus.textContent = "Resultado salvo localmente. Será sincronizado depois.";
         dom.results.saveStatus.style.color = '#d97706'; // amber-600

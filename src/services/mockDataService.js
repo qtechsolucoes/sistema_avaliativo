@@ -41,17 +41,22 @@ export const mockDataService = {
     },
     
     getAssessmentData(grade, discipline = 'Artes') {
+        // Gera questões e seleciona 10 aleatórias (simula comportamento real)
+        const allQuestions = this.generateMockQuestions(grade);
+        const selectedQuestions = this.selectRandomQuestions(allQuestions, 10);
+
         return {
             id: `mock-assessment-${grade}`,
             title: `Avaliação de ${discipline} - ${grade}º Ano`,
             baseText: `Texto base para ${discipline} do ${grade}º ano.`,
-            questions: this.generateMockQuestions(grade)
+            questions: selectedQuestions
         };
     },
-    
+
     generateMockQuestions(grade) {
         const questions = [];
-        for (let i = 1; i <= 5; i++) {
+        // Gera 15 questões para ter um pool maior
+        for (let i = 1; i <= 15; i++) {
             questions.push({
                 id: `mock-q${i}-${grade}`,
                 question_text: `Questão ${i} para o ${grade}º ano`,
@@ -64,6 +69,27 @@ export const mockDataService = {
             });
         }
         return questions;
+    },
+
+    /**
+     * Seleciona N questões aleatórias
+     * @param {Array} questions - Array de questões
+     * @param {number} count - Número de questões a selecionar
+     * @returns {Array} - Questões selecionadas
+     */
+    selectRandomQuestions(questions, count) {
+        if (questions.length <= count) {
+            return [...questions];
+        }
+
+        // Fisher-Yates shuffle
+        const shuffled = [...questions];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+
+        return shuffled.slice(0, count);
     },
 
     saveSubmission(submissionData) {

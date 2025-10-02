@@ -16,7 +16,6 @@ import { verifyAdminPassword, verifyUnlockPassword, isAuthLockedOut } from './ut
 import { SafeNotification } from './utils/sanitizer.js';
 import { initializeSupabase, testSupabaseConnection } from './services/supabaseClient.js';
 import { validateConfig } from './config.js';
-import './utils/dbTest.js'; // Importa testes de integração
 import './adaptive/index.js'; // Sistema adaptativo modularizado
 
 // ===================================================================================

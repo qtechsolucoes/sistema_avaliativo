@@ -68,7 +68,8 @@ export class HTMLSanitizer {
      */
     static createSafeElement(tagName, textContent = '', className = '') {
         const element = document.createElement(tagName);
-        element.textContent = this.escapeHTML(textContent);
+        // Usa textContent diretamente - navegador já escapa automaticamente
+        element.textContent = textContent;
         if (className) {
             element.className = className;
         }
@@ -80,7 +81,8 @@ export class HTMLSanitizer {
      */
     static setSafeText(element, text) {
         if (!element) return;
-        element.textContent = this.escapeHTML(text);
+        // Usa textContent diretamente - navegador já escapa automaticamente
+        element.textContent = text;
     }
 
     /**

@@ -268,32 +268,64 @@ class OnlineDataService {
             }
 
             // Processa questões conforme schema real
-            const validQuestions = (assessmentData.assessment_questions || [])
+            const allQuestions = (assessmentData.assessment_questions || [])
                 .map(aq => ({
                     ...aq.questions,
                     order: aq.question_order
                 }))
                 .filter(q => q && q.id && q.question_text)
-                .sort((a, b) => a.order - b.order)
                 .map(q => this.processQuestionOptions(q));
 
-            if (validQuestions.length === 0) {
+            if (allQuestions.length === 0) {
                 logService.warn('Nenhuma questão válida encontrada', { assessmentId: assessment.id });
                 return mockDataService.getAssessmentData(grade, disciplineName);
             }
 
-            logService.info(`Avaliação carregada com ${validQuestions.length} questões`);
+            // Seleciona 10 questões aleatórias (ou todas se houver menos de 10)
+            const selectedQuestions = this.selectRandomQuestions(allQuestions, 10);
+
+            logService.info(`Avaliação com ${allQuestions.length} questões disponíveis - ${selectedQuestions.length} questões selecionadas aleatoriamente`);
             return {
                 id: assessmentData.id,
                 title: assessmentData.title,
                 baseText: assessmentData.base_text || 'Texto de apoio não disponível.',
-                questions: validQuestions
+                questions: selectedQuestions
             };
 
         } catch (error) {
             logService.error('Falha crítica ao buscar avaliação', error);
             return mockDataService.getAssessmentData(grade, disciplineName);
         }
+    }
+
+    /**
+     * Seleciona N questões aleatórias de um array
+     * Usa algoritmo Fisher-Yates para garantir aleatoriedade justa
+     * @param {Array} questions - Array de questões
+     * @param {number} count - Número de questões a selecionar
+     * @returns {Array} - Array com questões selecionadas aleatoriamente
+     */
+    selectRandomQuestions(questions, count) {
+        // Se houver menos questões que o solicitado, retorna todas
+        if (questions.length <= count) {
+            logService.info(`Total de questões (${questions.length}) <= solicitado (${count}), retornando todas`);
+            return [...questions];
+        }
+
+        // Cria cópia do array para não modificar o original
+        const shuffled = [...questions];
+
+        // Algoritmo Fisher-Yates para embaralhar
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+
+        // Retorna apenas as N primeiras questões embaralhadas
+        const selected = shuffled.slice(0, count);
+
+        logService.info(`Selecionadas ${selected.length} questões aleatórias de ${questions.length} disponíveis`);
+        return selected;
     }
 
     processQuestionOptions(question) {
