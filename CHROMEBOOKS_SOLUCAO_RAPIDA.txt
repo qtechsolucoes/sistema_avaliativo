@@ -1,0 +1,168 @@
+═══════════════════════════════════════════════════════════════
+  🔴 PROBLEMA: CHROMEBOOKS NÃO RODAM SERVIDOR LOCAL
+═══════════════════════════════════════════════════════════════
+
+Chromebooks têm sistema operacional bloqueado.
+NÃO podem rodar Python, Node.js ou scripts locais.
+
+═══════════════════════════════════════════════════════════════
+  ✅ SOLUÇÃO: HOSPEDAR ONLINE (Obrigatório)
+═══════════════════════════════════════════════════════════════
+
+Você DEVE colocar o sistema na internet para funcionar em Chromebooks.
+
+═══════════════════════════════════════════════════════════════
+  🚀 MÉTODO 1: VERCEL (MAIS FÁCIL - 1 COMANDO)
+═══════════════════════════════════════════════════════════════
+
+1. Duplo clique em: DEPLOY_RAPIDO.bat
+
+2. Siga as instruções na tela
+
+3. Pronto! Link gerado: https://seu-projeto.vercel.app
+
+4. Configure variáveis:
+   - Acesse vercel.com
+   - Projeto > Settings > Environment Variables
+   - Adicione:
+     * SUPABASE_URL = https://seu-projeto.supabase.co
+     * SUPABASE_ANON_KEY = sua-chave-aqui
+
+5. Compartilhe o link com os Chromebooks!
+
+═══════════════════════════════════════════════════════════════
+  🌐 MÉTODO 2: NETLIFY (SEM CÓDIGO - ARRASTE E SOLTE)
+═══════════════════════════════════════════════════════════════
+
+1. Selecione TODOS os arquivos desta pasta
+
+2. Crie um arquivo ZIP
+
+3. Acesse: https://app.netlify.com/drop
+
+4. Arraste o ZIP para a página
+
+5. Aguarde 1 minuto
+
+6. Pronto! Link gerado: https://seu-site.netlify.app
+
+7. Configure variáveis:
+   - Site Settings > Environment variables
+   - Adicione SUPABASE_URL e SUPABASE_ANON_KEY
+
+8. Compartilhe o link!
+
+═══════════════════════════════════════════════════════════════
+  📱 MÉTODO 3: GITHUB PAGES (GRÁTIS)
+═══════════════════════════════════════════════════════════════
+
+1. Edite src/config.js (linha 20):
+
+   const envVars = {
+       'SUPABASE_URL': 'https://seu-projeto.supabase.co',
+       'SUPABASE_ANON_KEY': 'sua-chave-completa-aqui'
+   };
+
+2. Suba para GitHub (use GitHub Desktop se não souber Git)
+
+3. No repositório GitHub:
+   - Settings > Pages
+   - Source: main branch
+   - Save
+
+4. Link gerado: https://seu-usuario.github.io/sistema-avaliacoes
+
+5. Compartilhe o link!
+
+═══════════════════════════════════════════════════════════════
+  🏫 MÉTODO 4: SERVIDOR DA ESCOLA (Rede Local)
+═══════════════════════════════════════════════════════════════
+
+⚠️ PRECISA: 1 computador que NÃO seja Chromebook
+
+1. No computador do professor (Windows/Mac/Linux):
+
+   python -m http.server 8000
+
+2. Descubra o IP:
+
+   Windows: ipconfig (procure IPv4)
+   Mac/Linux: ifconfig
+
+3. Nos Chromebooks, acesse:
+
+   http://192.168.1.100:8000
+   (substitua pelo IP real)
+
+⚠️ Computador deve ficar ligado durante as provas!
+
+═══════════════════════════════════════════════════════════════
+  📊 COMPARAÇÃO
+═══════════════════════════════════════════════════════════════
+
+MÉTODO              | DIFICULDADE | TEMPO   | PERMANENTE
+--------------------+-------------+---------+------------
+Vercel (bat)        | ⭐          | 5 min   | ✅ Sim
+Netlify (arraste)   | ⭐          | 2 min   | ✅ Sim
+GitHub Pages        | ⭐⭐        | 10 min  | ✅ Sim
+Servidor Local      | ⭐⭐⭐      | 5 min   | ❌ Temporário
+
+═══════════════════════════════════════════════════════════════
+  🎯 RECOMENDAÇÃO
+═══════════════════════════════════════════════════════════════
+
+✅ MELHOR: Vercel (deploy com 1 clique em DEPLOY_RAPIDO.bat)
+
+✅ MAIS FÁCIL: Netlify Drop (arraste ZIP, sem código)
+
+✅ GRÁTIS: Todos são grátis!
+
+═══════════════════════════════════════════════════════════════
+  📋 DEPOIS DO DEPLOY
+═══════════════════════════════════════════════════════════════
+
+1. ✅ Teste o link no seu navegador
+
+2. ✅ Faça login teste
+
+3. ✅ Verifique se carrega questões do Supabase
+
+4. ✅ Teste em 1 Chromebook
+
+5. ✅ Se funcionar, compartilhe com todos!
+
+═══════════════════════════════════════════════════════════════
+  🆘 PROBLEMAS?
+═══════════════════════════════════════════════════════════════
+
+"Deploy deu erro"
+→ Veja CHROMEBOOKS_SEM_SERVIDOR.md (guia completo)
+
+"Link não abre"
+→ Verifique se copiou o link completo (https://...)
+
+"Não carrega questões"
+→ Configure variáveis de ambiente (SUPABASE_URL e ANON_KEY)
+
+"Chromebook bloqueado"
+→ Peça ao TI da escola para liberar vercel.app ou netlify.app
+
+═══════════════════════════════════════════════════════════════
+  ✅ RESUMO EXECUTIVO
+═══════════════════════════════════════════════════════════════
+
+CHROMEBOOKS PRECISAM: Sistema hospedado online (HTTPS)
+
+NÃO FUNCIONA: Abrir index.html direto ou servidor local no Chromebook
+
+FUNCIONA: Vercel, Netlify, GitHub Pages, ou servidor em outro PC
+
+TEMPO: 2-10 minutos para hospedar
+
+CUSTO: Grátis
+
+DEPOIS: Compartilhe o link, alunos acessam normalmente!
+
+═══════════════════════════════════════════════════════════════
+
+🚀 COMECE AGORA: Duplo clique em DEPLOY_RAPIDO.bat
