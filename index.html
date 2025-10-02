@@ -5,40 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plataforma de Avaliações</title>
 
-    <!--
-    ⚠️⚠️⚠️ ATENÇÃO ⚠️⚠️⚠️
-
-    NÃO ABRA ESTE ARQUIVO DIRETAMENTE (duplo clique)!
-
-    Isso causará erro 404 em config.js porque módulos ES6
-    não funcionam com protocolo file://
-
-    PARA USAR:
-    1. Abra o terminal nesta pasta
-    2. Execute: python -m http.server 8000
-    3. Acesse: http://localhost:8000
-
-    OU para Chromebooks:
-    - Deploy online (Vercel/Netlify)
-    - Veja: CHROMEBOOKS_SOLUCAO_RAPIDA.txt
-
-    ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
-    -->
-
-    <!-- CDNs Externos -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/heroicons@2.1.3/dist/solid/index.js" defer></script>
     
-    <!-- Fontes e Estilos Locais -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/main.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
 
-    <!-- Estilos customizados para o quiz -->
     <style>
         /* Scrollbar customizada para o texto de apoio */
         #text-scroll-container::-webkit-scrollbar {
@@ -572,13 +549,10 @@
     </style>
 
 </head>
-<!-- CORREÇÃO: Removidas as classes de layout do body -->
 <body class="p-4 md:p-8">
 
-    <!-- CORREÇÃO: As classes de layout agora são controladas aqui e pelo JS -->
     <div id="main-container" class="w-full">
 
-        <!-- TELA DE IDENTIFICAÇÃO -->
         <div id="login-screen" class="card max-w-lg mx-auto w-full">
             <h1 class="text-3xl font-bold mb-2 text-center">Plataforma de Avaliações</h1>
             <p class="text-slate-500 mb-8 text-center">Identifique-se para iniciar a sua prova.</p>
@@ -614,10 +588,8 @@
             </div>
         </div>
 
-        <!-- TELA DA AVALIAÇÃO PADRÃO -->
         <div id="quiz-screen" class="hidden w-full h-full overflow-hidden">
             <div class="w-full h-full flex flex-col md:flex-row gap-4 overflow-hidden">
-                <!-- Painel do Texto de Apoio -->
                 <div class="w-full md:w-5/12 lg:w-4/12 h-full bg-white/60 rounded-xl hidden md:block relative">
                     <div class="p-6 pb-0">
                         <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
@@ -627,35 +599,27 @@
                             </div>
                         </h3>
                     </div>
-                    <!-- Container do texto com scrollbar customizada -->
                     <div class="relative h-[calc(100%-80px)]">
                         <div id="text-scroll-container" class="h-full px-6 pb-6 overflow-y-auto scroll-smooth" style="scrollbar-width: thin; scrollbar-color: #cbd5e1 #f1f5f9;">
                             <div id="base-text-desktop" class="prose prose-sm max-w-none leading-relaxed"></div>
                         </div>
-                        <!-- Seta animada para indicar scroll -->
                         <div id="scroll-hint" class="absolute bottom-4 right-8 bg-blue-500 text-white px-3 py-2 rounded-lg shadow-lg text-xs font-semibold animate-bounce">
                             ↓ Role o texto ↓
                         </div>
                     </div>
                 </div>
 
-                <!-- Painel das Questões (Sempre Visível) -->
                 <div class="w-full md:w-7/12 lg:w-8/12 h-full flex flex-col p-4 md:p-6 overflow-hidden">
-                    <!-- Informações do Estudante (Fixo no topo) -->
                     <div id="student-info-display" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-slate-700 font-medium text-sm flex-shrink-0"></div>
 
-                    <!-- Container das Questões (Ocupa todo espaço disponível, sem scroll) -->
                     <div class="flex-grow flex flex-col justify-between overflow-hidden">
-                        <!-- Cabeçalho da Questão (Fixo) -->
                         <div class="flex-shrink-0 mb-4">
                             <p id="progress" class="text-sm text-slate-500 font-medium mb-2"></p>
                             <h2 id="question" class="font-bold leading-tight text-xl lg:text-2xl"></h2>
                         </div>
 
-                        <!-- Opções (Centralizadas e expandidas) -->
                         <div id="options-container" class="flex-grow flex flex-col justify-center gap-3 py-4"></div>
 
-                        <!-- Controles (Fixo no rodapé) -->
                         <div class="flex-shrink-0 pt-4">
                             <div id="feedback" class="text-base font-semibold min-h-[24px] mb-4"></div>
                             <div class="flex justify-between items-center">
@@ -673,7 +637,6 @@
             </div>
         </div>
 
-        <!-- NOVA TELA: AVALIAÇÃO DE ARRASTAR E SOLTAR -->
         <div id="drag-drop-screen" class="hidden card max-w-4xl mx-auto w-full">
             <h1 class="text-2xl font-bold mb-1 text-center">Atividade de Associação</h1>
             <p id="drag-drop-instruction" class="text-slate-500 mb-6 text-center">Arraste cada figura para a sua sombra correta.</p>
@@ -687,11 +650,8 @@
             <button id="drag-drop-next-btn" class="btn btn-primary w-full mt-4 hidden">Próximo Nível</button>
         </div>
         
-        <!-- TELA DE JOGOS ADAPTATIVOS -->
         <div id="adaptive-games-screen" class="hidden w-full h-full">
-            <!-- Container principal dos jogos adaptativos -->
             <div id="adaptive-game-container" class="w-full h-full flex flex-col">
-                <!-- Cabeçalho do jogo -->
                 <div id="adaptive-game-header" class="flex-shrink-0 p-4 bg-white/80 rounded-t-xl">
                     <div class="flex justify-between items-center">
                         <div>
@@ -705,12 +665,9 @@
                     </div>
                 </div>
 
-                <!-- Área do jogo -->
                 <div id="adaptive-game-area" class="flex-grow p-4 overflow-hidden">
-                    <!-- O conteúdo do jogo será inserido aqui dinamicamente -->
-                </div>
+                    </div>
 
-                <!-- Controles do jogo -->
                 <div id="adaptive-game-controls" class="flex-shrink-0 p-4 bg-white/80 rounded-b-xl">
                     <div class="flex justify-between items-center">
                         <div id="adaptive-game-feedback" class="text-lg font-semibold"></div>
@@ -724,7 +681,6 @@
             </div>
         </div>
 
-        <!-- TELA DE RESULTADOS -->
         <div id="results-screen" class="hidden card max-w-2xl mx-auto text-center">
             <h1 class="text-3xl font-bold mb-4">Avaliação Finalizada!</h1>
             <p class="text-lg text-slate-600 mb-2">Você acertou:</p>
@@ -737,7 +693,6 @@
             </button>
         </div>
 
-        <!-- ÁREA DO PROFESSOR -->
         <div id="teacher-area-screen" class="hidden card max-w-2xl mx-auto">
             <h1 class="text-3xl font-bold mb-6 text-center">Área do Professor</h1>
             <div class="space-y-6">
@@ -774,7 +729,6 @@
              <button id="back-to-start-from-teacher-area-btn" class="text-sm text-slate-500 hover:text-blue-600 mt-8 block text-center transition">Voltar</button>
         </div>
 
-        <!-- PAINEL DO PROFESSOR -->
         <div id="teacher-dashboard" class="hidden w-full">
             <div class="card w-full max-w-screen-2xl mx-auto">
                 <div class="flex justify-between items-center mb-6">
@@ -841,7 +795,6 @@
             </div>
         </div>
 
-        <!-- MODAL DE CONFIRMAÇÃO -->
         <div id="confirmation-modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden items-center justify-center p-4">
              <div id="confirmation-modal" class="card max-w-md mx-auto text-center">
                 <h2 class="text-2xl font-bold mb-4">Confirme seus Dados</h2>
@@ -854,7 +807,6 @@
             </div>
         </div>
 
-        <!-- Sidebar de Texto para Mobile (agora fora do quiz-screen para melhor controle) -->
         <div id="text-panel-mobile" class="fixed top-0 left-0 h-full w-4/5 max-w-sm bg-white shadow-lg p-6 overflow-y-auto z-30 transform -translate-x-full">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-xl font-bold">Texto de Apoio</h3>
@@ -866,10 +818,8 @@
 
     </div>
 
-    <!-- Script principal da aplicação -->
-    <script type="module" src="src/main.js" id="main-script"></script>
+    <script type="module" src="/src/main.js" id="main-script"></script>
 
-    <!-- Detector de erro de protocolo file:// -->
     <script>
         // Detecta se está usando file:// e mostra aviso
         window.addEventListener('error', function(e) {
