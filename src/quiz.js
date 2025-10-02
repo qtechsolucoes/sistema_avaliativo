@@ -8,7 +8,7 @@ import { routeAssessment } from './adaptive/index.js';
 import { logService } from './services/logService.js';
 import { HTMLSanitizer } from './utils/sanitizer.js';
 import { connectivityService } from './services/connectivityService.js';
-import { startQuestionTimer, stopQuestionTimer } from './utils/questionTimer.js';
+import { startQuestionTimer, stopQuestionTimer, currentTimer } from './utils/questionTimer.js';
 
 /**
  * Ponto de entrada principal para iniciar o fluxo da avaliação.
@@ -162,18 +162,25 @@ function loadQuestion() {
             dom.quiz.optionsContainer.appendChild(button);
         });
 
-        // Inicia timer de 3 minutos (APENAS informativo, não bloqueia)
+        // Para e remove o timer da questão anterior, se houver
+        stopQuestionTimer();
+
+        // Inicia timer de 3 minutos OBRIGATÓRIO
+        // O aluno pode responder a qualquer momento, mas só pode AVANÇAR após 3 minutos
         startQuestionTimer({
             minTime: 180, // 3 minutos em segundos
             onUnblock: () => {
-                // Timer desbloqueado - mostra mensagem motivacional
-                logService.info('3 minutos completados - aluno pode avançar quando quiser');
+                // Desbloqueia o botão "Próxima" somente se já tiver respondido
+                if (!dom.quiz.nextBtn.classList.contains('hidden')) {
+                    dom.quiz.nextBtn.disabled = false;
+                    logService.info('3 minutos completados - aluno pode avançar!');
+                }
             }
         });
 
-        // Botão "Próxima" sempre fica escondido até responder
-        // NÃO É MAIS BLOQUEADO PELO TIMER
-        dom.quiz.nextBtn.disabled = false;
+        // Botão "Próxima" fica escondido até que o aluno responda
+        // E quando aparecer, fica BLOQUEADO até completar 3 minutos
+        dom.quiz.nextBtn.disabled = true;
 
     } catch (error) {
         logService.critical('Falha ao carregar a questão.', { questionIndex: state.currentQuestionIndex, error });
@@ -234,6 +241,26 @@ function selectAnswer(selectedButton, isCorrect, questionId) {
         dom.quiz.nextBtn.textContent = "Finalizar Avaliação";
     } else {
         dom.quiz.nextBtn.textContent = "Próxima Pergunta";
+    }
+
+    // Verifica se já passou os 3 minutos
+    // Se não passou, o botão fica BLOQUEADO até o timer desbloquear
+    // Se já passou, desbloqueia imediatamente
+    if (currentTimer && currentTimer.isStillBlocked()) {
+        dom.quiz.nextBtn.disabled = true;
+
+        // Adiciona tooltip explicativo
+        dom.quiz.nextBtn.title = "Aguarde os 3 minutos completarem para avançar";
+
+        // Feedback visual de que está aguardando
+        showWaitingForTimerMessage();
+
+        logService.info('Aluno respondeu, mas deve aguardar os 3 minutos para avançar');
+    } else {
+        // Já passou os 3 minutos - pode avançar imediatamente
+        dom.quiz.nextBtn.disabled = false;
+        dom.quiz.nextBtn.title = "Clique para avançar";
+        logService.info('Aluno respondeu após 3 minutos - pode avançar imediatamente');
     }
 }
 
@@ -297,7 +324,7 @@ export async function finishAssessment() {
     let saveResult;
 
     if (connectivityResult.mode === 'online') {
-        // Sistema online - salva no banco de dados normalmente
+        // Sistema online - salva no banco de dados normally
         dom.results.saveStatus.textContent = 'Salvando no banco de dados...';
         saveResult = await saveSubmission(submissionData);
     } else {
@@ -452,6 +479,43 @@ function displaySaveResult(result) {
         dom.results.saveStatus.textContent = `Erro ao salvar: ${result.details || 'Tente novamente.'}`;
         dom.results.saveStatus.style.color = 'red';
     }
+}
+
+/**
+ * Mostra mensagem de que o aluno deve aguardar o timer
+ */
+function showWaitingForTimerMessage() {
+    // Remove mensagem anterior se existir
+    const existingMessage = document.getElementById('waiting-timer-message');
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+
+    // Cria mensagem informativa
+    const message = document.createElement('div');
+    message.id = 'waiting-timer-message';
+    message.className = 'fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-xl z-40 flex items-center gap-3';
+    message.style.animation = 'slideUp 0.5s ease-out';
+
+    // Ícone de relógio
+    const icon = document.createElement('span');
+    icon.className = 'text-2xl';
+    icon.textContent = '⏳';
+
+    // Texto
+    const text = document.createElement('span');
+    text.className = 'font-semibold';
+    text.textContent = 'Aguarde completar 3 minutos para avançar';
+
+    message.appendChild(icon);
+    message.appendChild(text);
+    document.body.appendChild(message);
+
+    // Remove após 4 segundos
+    setTimeout(() => {
+        message.style.animation = 'fadeOut 0.5s ease-out';
+        setTimeout(() => message.remove(), 500);
+    }, 4000);
 }
 
 /**

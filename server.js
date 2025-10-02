@@ -4,16 +4,58 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const compression = require('compression');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.static('.'));
+// ==========================================
+// CONFIGURAÇÕES DE PERFORMANCE
+// ==========================================
+
+// Aumenta limite de conexões simultâneas do Node.js
+require('http').globalAgent.maxSockets = 100;
+require('https').globalAgent.maxSockets = 100;
+
+// Trust proxy (importante para redes locais)
+app.set('trust proxy', true);
+
+// Desabilita header desnecessário
+app.disable('x-powered-by');
+
+// ==========================================
+// MIDDLEWARE (na ordem correta)
+// ==========================================
+
+// 1. Compressão GZIP (reduz tamanho das respostas em ~70%)
+app.use(compression({
+    threshold: 1024, // Comprime apenas respostas > 1KB
+    level: 6 // Nível de compressão (1-9, 6 é balanceado)
+}));
+
+// 2. CORS configurado para rede local
+app.use(cors({
+    origin: '*', // Permite qualquer origem na rede local
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false,
+    maxAge: 86400 // Cache preflight por 24h
+}));
+
+// 3. Parser JSON com limite adequado
+app.use(express.json({
+    limit: '10mb', // Reduzido de 50mb para 10mb (suficiente)
+    strict: true
+}));
+
+// 4. Arquivos estáticos com cache
+app.use(express.static('.', {
+    maxAge: '1h', // Cache de 1 hora para arquivos estáticos
+    etag: true,
+    lastModified: true
+}));
 
 // ==========================================
 // CACHE EM MEMÓRIA
@@ -26,8 +68,57 @@ const cache = {
     isReady: false
 };
 
+// ==========================================
+// MONITORAMENTO DE CONEXÕES
+// ==========================================
+const connectionStats = {
+    activeConnections: 0,
+    totalRequests: 0,
+    cacheHits: 0,
+    cacheMisses: 0,
+    peakConnections: 0,
+    startTime: Date.now()
+};
+
+// Middleware para contar conexões ativas
+app.use((req, res, next) => {
+    connectionStats.activeConnections++;
+    connectionStats.totalRequests++;
+
+    // Atualiza pico de conexões
+    if (connectionStats.activeConnections > connectionStats.peakConnections) {
+        connectionStats.peakConnections = connectionStats.activeConnections;
+    }
+
+    // Diminui contador quando resposta termina
+    res.on('finish', () => {
+        connectionStats.activeConnections--;
+    });
+
+    next();
+});
+
 // Cliente Supabase
 let supabase = null;
+
+// ==========================================
+// FUNÇÕES UTILITÁRIAS
+// ==========================================
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+function formatUptime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours}h ${minutes}m ${secs}s`;
+}
 
 function initializeSupabase() {
     const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -159,8 +250,11 @@ async function loadDataFromSupabase() {
 // ROTAS DA API - SERVINDO DO CACHE
 // ==========================================
 
-// Status do servidor
+// Status do servidor (com estatísticas de performance)
 app.get('/api/status', (req, res) => {
+    const uptime = Math.floor((Date.now() - connectionStats.startTime) / 1000);
+    const uptimeFormatted = formatUptime(uptime);
+
     res.json({
         status: 'online',
         cacheReady: cache.isReady,
@@ -169,6 +263,22 @@ app.get('/api/status', (req, res) => {
             classes: cache.classes?.length || 0,
             students: cache.students?.length || 0,
             assessments: cache.assessments?.length || 0
+        },
+        performance: {
+            activeConnections: connectionStats.activeConnections,
+            peakConnections: connectionStats.peakConnections,
+            totalRequests: connectionStats.totalRequests,
+            cacheHitRate: connectionStats.totalRequests > 0
+                ? `${Math.round((connectionStats.cacheHits / connectionStats.totalRequests) * 100)}%`
+                : '0%',
+            uptime: uptimeFormatted,
+            memoryUsage: formatBytes(process.memoryUsage().heapUsed)
+        },
+        capacity: {
+            maxRecommended: 50,
+            current: connectionStats.activeConnections,
+            status: connectionStats.activeConnections <= 30 ? 'OK' :
+                    connectionStats.activeConnections <= 50 ? 'HIGH' : 'CRITICAL'
         }
     });
 });
@@ -183,9 +293,11 @@ app.post('/api/reload-cache', async (req, res) => {
 // Buscar turmas por ano
 app.get('/api/classes/:grade', (req, res) => {
     if (!cache.isReady) {
+        connectionStats.cacheMisses++;
         return res.status(503).json({ error: 'Cache não está pronto' });
     }
 
+    connectionStats.cacheHits++;
     const grade = parseInt(req.params.grade);
     const classes = cache.classes.filter(c => c.grade === grade);
 
@@ -196,9 +308,11 @@ app.get('/api/classes/:grade', (req, res) => {
 // Buscar estudantes por turma
 app.get('/api/students/:classId', (req, res) => {
     if (!cache.isReady) {
+        connectionStats.cacheMisses++;
         return res.status(503).json({ error: 'Cache não está pronto' });
     }
 
+    connectionStats.cacheHits++;
     const classId = req.params.classId;
 
     // Filtra estudantes que estão matriculados nesta turma
@@ -222,9 +336,11 @@ app.get('/api/students/:classId', (req, res) => {
 // Buscar avaliação por ano
 app.get('/api/assessment/:grade', (req, res) => {
     if (!cache.isReady) {
+        connectionStats.cacheMisses++;
         return res.status(503).json({ error: 'Cache não está pronto' });
     }
 
+    connectionStats.cacheHits++;
     const grade = parseInt(req.params.grade);
     const disciplineName = req.query.discipline || 'Artes';
 
