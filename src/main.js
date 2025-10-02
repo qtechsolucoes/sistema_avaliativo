@@ -12,7 +12,7 @@ import { setupModalListeners, setupSidebarListeners } from './ui.js';
 import { teacherModule } from './teacher/index.js';
 import { logService } from './services/logService.js';
 import { errorHandler } from './utils/errorHandler.js';
-import { verifyAdminPassword, verifyUnlockPassword, isAuthLockedOut } from './utils/auth.js';
+import { verifyAdminPassword, isAuthLockedOut } from './utils/auth.js';
 import { SafeNotification } from './utils/sanitizer.js';
 import { initializeSupabase, testSupabaseConnection } from './services/supabaseClient.js';
 import { validateConfig } from './config.js';
@@ -216,48 +216,6 @@ function resetApp() {
     
     // Mostra a tela de login
     showScreen('login');
-}
-
-/**
- * Desbloqueia o dispositivo com verificação de senha segura
- */
-async function unlockDevice() {
-    try {
-        // Verifica se está em lockout
-        const lockStatus = isAuthLockedOut();
-        if (lockStatus.locked) {
-            SafeNotification.createError(
-                'Dispositivo Bloqueado',
-                `Muitas tentativas falhas. Tente novamente em ${lockStatus.remainingMinutes} minutos.`
-            );
-            return;
-        }
-
-        const password = prompt("Para desbloquear, insira a senha do administrador:");
-
-        if (password === null) return; // Usuário cancelou
-
-        const isValid = await verifyUnlockPassword(password);
-
-        if (isValid) {
-            // Senha correta
-            localStorage.removeItem('deviceLocked');
-
-            logService.info('Dispositivo desbloqueado com sucesso');
-            SafeNotification.createSuccess(
-                'Sucesso',
-                'Dispositivo desbloqueado com sucesso!'
-            );
-            resetApp();
-        }
-
-    } catch (error) {
-        SafeNotification.createError(
-            'Erro de Autenticação',
-            error.message
-        );
-        logService.warn('Tentativa de desbloqueio falhou', { error: error.message });
-    }
 }
 
 /**
@@ -478,14 +436,8 @@ function initializeApp() {
         
         // Verifica progresso salvo
         const hasProgress = checkSavedProgress();
-        
-        // Verifica estado do dispositivo
-        const isDeviceLocked = localStorage.getItem('deviceLocked') === 'true';
-        
-        if (isDeviceLocked) {
-            logService.info('Dispositivo bloqueado detectado');
-            showScreen('locked');
-        } else if (hasProgress) {
+
+        if (hasProgress) {
             // Se recuperou progresso, vai direto para a tela do quiz
             showScreen('quiz');
         } else {
@@ -517,15 +469,8 @@ function setupNavigationListeners() {
     // Botão de voltar ao início após resultados
     if (dom.results.backToStartBtn) {
         dom.results.backToStartBtn.addEventListener('click', () => {
-            // Bloqueia o dispositivo após conclusão
-            localStorage.setItem('deviceLocked', 'true');
-            showScreen('locked');
+            resetApp();
         });
-    }
-
-    // Botão de desbloqueio
-    if (dom.locked.unlockBtn) {
-        dom.locked.unlockBtn.addEventListener('click', unlockDevice);
     }
 
     // Previne navegação acidental
@@ -696,7 +641,6 @@ if (APP_CONFIG.DEBUG_MODE) {
                 state,
                 config: APP_CONFIG,
                 resetApp,
-                unlockDevice,
                 sessionManager,
                 performanceMonitor,
                 logService,

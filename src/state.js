@@ -20,7 +20,6 @@ export const dom = {
         results: document.getElementById('results-screen'),
         teacherArea: document.getElementById('teacher-area-screen'),
         teacherDashboard: document.getElementById('teacher-dashboard'),
-        locked: document.getElementById('locked-screen'),
         // ADICIONADO: Nova tela de avaliação
         dragDrop: document.getElementById('drag-drop-screen'),
         // ADICIONADO: Tela de jogos adaptativos
@@ -80,9 +79,6 @@ export const dom = {
         studentInfo: document.getElementById('modal-student-info'),
         confirmBtn: document.getElementById('confirm-finish-btn'),
         cancelBtn: document.getElementById('cancel-finish-btn')
-    },
-    locked: {
-        unlockBtn: document.getElementById('unlock-btn')
     },
     // ADICIONADO: Elementos da nova avaliação de arrastar e soltar
     dragDrop: {

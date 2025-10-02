@@ -344,11 +344,6 @@ export async function finishAssessment() {
     }
 
     displaySaveResult(saveResult);
-
-    // Bloqueia o dispositivo apenas se o salvamento foi bem-sucedido
-    if (saveResult.success) {
-        localStorage.setItem('deviceLocked', 'true');
-    }
 }
 
 /**
