@@ -1,17 +1,17 @@
 // src/utils/questionTimer.js
-// Timer Visual e Bloqueio de 3 Minutos por Questão
+// Timer Visual e Bloqueio de 1 Minuto por Questão
 
 import { logService } from '../services/logService.js';
 
 /**
  * Gerenciador de Timer para Questões
  * - Mostra timer visual na tela
- * - Bloqueia botão "Próxima" por 3 minutos
+ * - Bloqueia botão "Próxima" por 1 minuto
  * - Emite avisos sonoros quando tempo está acabando
  */
 export class QuestionTimer {
     constructor(config = {}) {
-        this.minTime = config.minTime || 180; // 3 minutos em segundos
+        this.minTime = config.minTime || 60; // 1 minuto em segundos
         this.warningTime = config.warningTime || 30; // Aviso aos 30s restantes
         this.elapsedTime = 0;
         this.timerInterval = null;

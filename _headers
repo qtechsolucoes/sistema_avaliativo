@@ -1,0 +1,26 @@
+# Configuração de Headers para Netlify
+# Garante que arquivos JavaScript sejam servidos com MIME type correto
+
+# Todos os arquivos .js na raiz
+/*.js
+  Content-Type: application/javascript; charset=utf-8
+
+# Todos os arquivos .js em /src/
+/src/*.js
+  Content-Type: application/javascript; charset=utf-8
+
+# Todos os arquivos .js em subpastas de /src/
+/src/*/*.js
+  Content-Type: application/javascript; charset=utf-8
+
+# Todos os arquivos .js em qualquer lugar
+/**.js
+  Content-Type: application/javascript; charset=utf-8
+
+# HTML sem cache
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Index.html
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate

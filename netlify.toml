@@ -10,12 +10,15 @@
 [build.environment]
   NODE_VERSION = "18"
 
-# Redirecionamento SPA - todas as rotas vão para index.html
+# SPA redirect apenas para rotas HTML (não para assets)
+# Isso evita que arquivos .js sejam redirecionados para index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
   force = false
+  # Exclui arquivos com extensão conhecida
+  conditions = {path = ["!*.js", "!*.css", "!*.json", "!*.png", "!*.jpg", "!*.svg", "!*.html"]}
 
 # Headers de segurança
 [[headers]]
@@ -26,11 +29,25 @@
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "no-referrer-when-downgrade"
 
-# Cache para arquivos JavaScript
+# MIME type correto para módulos JavaScript
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# MIME type correto para módulos JavaScript em subpastas
 [[headers]]
   for = "/src/*.js"
   [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/src/**/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 # Cache para arquivos CSS
 [[headers]]

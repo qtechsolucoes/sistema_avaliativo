@@ -1,8 +1,12 @@
 # 🚀 Guia Completo: Deploy no Netlify
 
-## ✅ **Solução para Erro 404**
+## ✅ **Solução para Erros Comuns**
 
+### **Erro 404:**
 O erro 404 acontece porque o Netlify está tentando procurar arquivos em pastas erradas (como `dist/` ou `build/`), mas seu projeto não tem essas pastas - é um projeto **vanilla** (HTML, CSS, JS puros).
+
+### **Erro "Expected a JavaScript module but server responded with MIME type text/html":**
+Esse erro acontece quando o Netlify redireciona requisições de arquivos `.js` para o `index.html` devido a configurações de SPA redirect incorretas. Os arquivos `netlify.toml` e `_headers` já foram criados para corrigir isso.
 
 ---
 
@@ -59,14 +63,24 @@ Ainda em "Build & deploy":
 
 ---
 
-### **Método 2: Via Arquivo netlify.toml (AUTOMÁTICO)**
+### **Método 2: Via Arquivos de Configuração (AUTOMÁTICO - RECOMENDADO)**
 
-Já criei o arquivo `netlify.toml` na raiz do projeto. Agora:
+Já criei dois arquivos na raiz do projeto que configuram tudo automaticamente:
+- `netlify.toml` - Configurações de build e redirects
+- `_headers` - Headers HTTP para MIME types corretos
+
+Esses arquivos resolvem:
+- ✅ Erro 404 (configurando publish directory correto)
+- ✅ Erro de MIME type em módulos JavaScript
+- ✅ Headers de segurança
+- ✅ Cache adequado
+
+Agora você só precisa fazer:
 
 #### **1. Commit e Push:**
 ```bash
-git add netlify.toml
-git commit -m "Configuração Netlify"
+git add netlify.toml _headers
+git commit -m "Configuração Netlify com fix de MIME types"
 git push
 ```
 
@@ -132,7 +146,25 @@ https://seu-site.netlify.app
 
 ---
 
-### **Problema 2: "Failed to load module"**
+### **Problema 2: "Expected JavaScript module but server responded with MIME type text/html"**
+
+**Causa:** Netlify está redirecionando requisições de `.js` para `index.html` devido a configuração de SPA redirect incorreta
+
+**Solução:**
+1. Certifique-se de que os arquivos `netlify.toml` e `_headers` estão na raiz do projeto
+2. Faça commit e push desses arquivos
+3. Trigger deploy novamente no Netlify
+4. Aguarde 2-3 minutos para o deploy completar
+
+**Verificar se funcionou:**
+- Abra DevTools (F12) → Network
+- Recarregue a página
+- Clique em qualquer arquivo `.js`
+- Verifique se "Content-Type" mostra `application/javascript`
+
+---
+
+### **Problema 3: "Failed to load module"**
 
 **Causa:** Imports relativos incorretos
 
@@ -150,7 +182,7 @@ Verifique se os imports em `index.html` estão assim:
 
 ---
 
-### **Problema 3: Supabase não conecta**
+### **Problema 4: Supabase não conecta**
 
 **Causa:** Variáveis de ambiente não configuradas
 
@@ -163,7 +195,7 @@ Verifique se os imports em `index.html` estão assim:
 
 ---
 
-### **Problema 4: RLS bloqueando**
+### **Problema 5: RLS bloqueando**
 
 **Causa:** Row Level Security ativo no Supabase
 
