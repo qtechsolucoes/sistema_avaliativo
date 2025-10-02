@@ -1,4 +1,4 @@
-# ⏱️ Como Funciona o Timer de 3 Minutos
+# ⏱️ Como Funciona o Timer de 1 Minuto
 
 ## 📋 Regras do Sistema
 
@@ -10,7 +10,7 @@
 
 ### ❌ O que o aluno NÃO PODE fazer:
 
-1. **Avançar para próxima questão** antes de completar 3 minutos
+1. **Avançar para próxima questão** antes de completar 1 minuto
 2. **Responder sem ler o texto** até o final (90%)
 
 ---
@@ -19,7 +19,7 @@
 
 ```
 1. Questão carrega
-   └─> Timer de 3min inicia (canto superior direito)
+   └─> Timer de 1min inicia (canto superior direito)
    └─> Texto de apoio aparece
    └─> Alternativas aparecem
    └─> Botão "Próxima" está ESCONDIDO
@@ -37,14 +37,14 @@
            └─> Mostra feedback (verde/vermelho)
            └─> Botão "Próxima" APARECE
            └─> Verifica timer:
-               ├─> Ainda não passou 3min:
+               ├─> Ainda não passou 1min:
                │   └─> Botão fica BLOQUEADO (disabled)
-               │   └─> Mostra: "⏳ Aguarde completar 3 minutos"
-               └─> Já passou 3min:
+               │   └─> Mostra: "⏳ Aguarde completar 1 minuto"
+               └─> Já passou 1min:
                    └─> Botão fica LIBERADO (enabled)
                    └─> Aluno pode clicar e avançar
 
-4. Timer completa 3 minutos
+4. Timer completa 1 minuto
    └─> Som de desbloqueio toca
    └─> Timer fica verde
    └─> Se já respondeu:
@@ -61,31 +61,31 @@
 
 ## 🎯 Cenários Possíveis
 
-### **Cenário 1: Aluno responde RÁPIDO (antes de 3min)**
+### **Cenário 1: Aluno responde RÁPIDO (antes de 1min)**
 
 ```
-00:30 - Aluno lê o texto
-00:45 - ✅ Texto lido (chegou a 90%)
-01:00 - Aluno marca alternativa
+00:15 - Aluno lê o texto
+00:25 - ✅ Texto lido (chegou a 90%)
+00:30 - Aluno marca alternativa
        └─> Feedback: "Resposta Correta!"
        └─> Botão "Próxima" APARECE mas fica BLOQUEADO
-       └─> Mensagem: "⏳ Aguarde completar 3 minutos"
-02:00 - Aluno espera...
-03:00 - ✅ Timer completa!
+       └─> Mensagem: "⏳ Aguarde completar 1 minuto"
+00:45 - Aluno espera...
+01:00 - ✅ Timer completa!
        └─> Som de desbloqueio
        └─> Botão "Próxima" é LIBERADO
        └─> Aluno pode avançar
 ```
 
-### **Cenário 2: Aluno responde DEVAGAR (depois de 3min)**
+### **Cenário 2: Aluno responde DEVAGAR (depois de 1min)**
 
 ```
-00:30 - Aluno lê o texto
-01:00 - ✅ Texto lido
-02:00 - Aluno pensa...
-03:00 - ✅ Timer completa!
+00:20 - Aluno lê o texto
+00:35 - ✅ Texto lido
+00:50 - Aluno pensa...
+01:00 - ✅ Timer completa!
        └─> Som de desbloqueio
-03:30 - Aluno finalmente marca alternativa
+01:15 - Aluno finalmente marca alternativa
        └─> Feedback: "Resposta Incorreta"
        └─> Botão "Próxima" APARECE e já está LIBERADO
        └─> Aluno pode avançar IMEDIATAMENTE

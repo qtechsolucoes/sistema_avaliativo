@@ -6,7 +6,8 @@
       "Bash(cat:*)",
       "Bash(python:*)",
       "Bash(npm install)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

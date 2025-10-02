@@ -77,7 +77,7 @@ export class QuestionTimer {
         const statusMessage = document.createElement('div');
         statusMessage.id = 'timer-status-message';
         statusMessage.className = 'text-xs text-center text-blue-100 mb-2';
-        statusMessage.textContent = 'Aguarde 3min';
+        statusMessage.textContent = 'Aguarde 1min';
 
         // Barra de progresso menor
         const progressContainer = document.createElement('div');

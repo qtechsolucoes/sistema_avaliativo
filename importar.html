@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importar Provas Offline</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <!-- Cabeçalho -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">📤 Importar Provas Salvas Offline</h1>
+            <p class="text-gray-600">Importe os arquivos JSON das provas que foram salvas localmente nos Chromebooks</p>
+        </div>
+
+        <!-- Área de Upload -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">1️⃣ Selecione os arquivos JSON</h2>
+
+            <div class="border-4 border-dashed border-blue-300 rounded-xl p-12 text-center hover:border-blue-500 transition-colors cursor-pointer bg-blue-50" id="dropZone">
+                <input type="file" id="fileInput" accept=".json" multiple class="hidden">
+                <div class="mb-4">
+                    <svg class="w-16 h-16 mx-auto text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                </div>
+                <p class="text-lg font-semibold text-gray-700 mb-2">Arraste os arquivos aqui ou clique para selecionar</p>
+                <p class="text-sm text-gray-500">Aceita múltiplos arquivos .json</p>
+            </div>
+
+            <div class="mt-4" id="fileList"></div>
+        </div>
+
+        <!-- Botão de Importação -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+            <button id="importBtn" disabled class="w-full bg-gray-400 text-white font-bold py-4 px-6 rounded-xl cursor-not-allowed transition-all">
+                Selecione arquivos para importar
+            </button>
+        </div>
+
+        <!-- Resultado -->
+        <div id="resultArea" class="hidden">
+            <div class="bg-white rounded-2xl shadow-xl p-8">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">📊 Resultado da Importação</h2>
+                <div id="resultContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        // Configuração do Supabase
+        const supabaseUrl = 'https://vvpzwypeydzpwyrpvqcf.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2cHp3eXBleWR6cHd5cnB2cWNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxOTgyMzIsImV4cCI6MjA3Mzc3NDIzMn0.gHDGSdIKuKUGeYazg247fRhFxGB0_NLhsKXwNQz84Cg';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        let selectedFiles = [];
+
+        // Elementos DOM
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const importBtn = document.getElementById('importBtn');
+        const resultArea = document.getElementById('resultArea');
+        const resultContent = document.getElementById('resultContent');
+
+        // Event Listeners
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+        importBtn.addEventListener('click', importFiles);
+
+        // Drag & Drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-600', 'bg-blue-100');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-blue-600', 'bg-blue-100');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-600', 'bg-blue-100');
+            fileInput.files = e.dataTransfer.files;
+            handleFileSelect({ target: { files: e.dataTransfer.files } });
+        });
+
+        function handleFileSelect(e) {
+            selectedFiles = Array.from(e.target.files);
+            displayFileList();
+            updateImportButton();
+        }
+
+        function displayFileList() {
+            if (selectedFiles.length === 0) {
+                fileList.innerHTML = '';
+                return;
+            }
+
+            fileList.innerHTML = `
+                <div class="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <h3 class="font-semibold text-gray-700 mb-2">📁 Arquivos selecionados (${selectedFiles.length}):</h3>
+                    <ul class="space-y-1">
+                        ${selectedFiles.map(file => `
+                            <li class="text-sm text-gray-600 flex items-center">
+                                <span class="mr-2">📄</span>
+                                ${file.name}
+                                <span class="ml-auto text-xs text-gray-400">${(file.size / 1024).toFixed(2)} KB</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        function updateImportButton() {
+            if (selectedFiles.length > 0) {
+                importBtn.disabled = false;
+                importBtn.className = 'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl cursor-pointer transition-all transform hover:scale-105';
+                importBtn.textContent = `Importar ${selectedFiles.length} arquivo(s)`;
+            } else {
+                importBtn.disabled = true;
+                importBtn.className = 'w-full bg-gray-400 text-white font-bold py-4 px-6 rounded-xl cursor-not-allowed transition-all';
+                importBtn.textContent = 'Selecione arquivos para importar';
+            }
+        }
+
+        async function importFiles() {
+            importBtn.disabled = true;
+            importBtn.textContent = '⏳ Importando...';
+
+            const results = {
+                total: selectedFiles.length,
+                success: 0,
+                errors: 0,
+                details: []
+            };
+
+            for (const file of selectedFiles) {
+                try {
+                    const content = await file.text();
+                    const data = JSON.parse(content);
+
+                    // Validar dados
+                    if (!data.studentId || !data.assessmentId) {
+                        throw new Error('Dados incompletos no arquivo');
+                    }
+
+                    // Enviar para Supabase usando RPC
+                    const { data: result, error } = await supabase.rpc('submit_assessment', {
+                        p_student_id: data.studentId,
+                        p_assessment_id: data.assessmentId,
+                        p_score: data.score,
+                        p_total_questions: data.totalQuestions,
+                        p_total_duration: data.totalDuration,
+                        p_answers: data.answerLog
+                    });
+
+                    if (error) throw error;
+
+                    results.success++;
+                    results.details.push({
+                        file: file.name,
+                        student: data.studentName,
+                        status: 'success',
+                        message: 'Importado com sucesso'
+                    });
+
+                } catch (error) {
+                    results.errors++;
+                    results.details.push({
+                        file: file.name,
+                        status: 'error',
+                        message: error.message
+                    });
+                }
+            }
+
+            displayResults(results);
+            updateImportButton();
+        }
+
+        function displayResults(results) {
+            resultArea.classList.remove('hidden');
+
+            const successRate = Math.round((results.success / results.total) * 100);
+
+            resultContent.innerHTML = `
+                <div class="mb-6">
+                    <div class="grid grid-cols-3 gap-4 mb-4">
+                        <div class="bg-blue-50 p-4 rounded-lg text-center">
+                            <div class="text-3xl font-bold text-blue-600">${results.total}</div>
+                            <div class="text-sm text-gray-600">Total</div>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg text-center">
+                            <div class="text-3xl font-bold text-green-600">${results.success}</div>
+                            <div class="text-sm text-gray-600">Sucesso</div>
+                        </div>
+                        <div class="bg-red-50 p-4 rounded-lg text-center">
+                            <div class="text-3xl font-bold text-red-600">${results.errors}</div>
+                            <div class="text-sm text-gray-600">Erros</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-100 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-semibold text-gray-700">Taxa de sucesso</span>
+                            <span class="text-sm font-bold ${successRate === 100 ? 'text-green-600' : 'text-yellow-600'}">${successRate}%</span>
+                        </div>
+                        <div class="w-full bg-gray-300 rounded-full h-3">
+                            <div class="bg-green-500 h-3 rounded-full transition-all" style="width: ${successRate}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <h3 class="font-semibold text-gray-700 mb-3">Detalhes:</h3>
+                    ${results.details.map(detail => `
+                        <div class="flex items-center p-3 rounded-lg ${detail.status === 'success' ? 'bg-green-50' : 'bg-red-50'}">
+                            <span class="mr-3">${detail.status === 'success' ? '✅' : '❌'}</span>
+                            <div class="flex-1">
+                                <div class="font-medium ${detail.status === 'success' ? 'text-green-800' : 'text-red-800'}">
+                                    ${detail.file}
+                                </div>
+                                ${detail.student ? `<div class="text-sm text-gray-600">Aluno: ${detail.student}</div>` : ''}
+                                <div class="text-sm ${detail.status === 'success' ? 'text-green-600' : 'text-red-600'}">
+                                    ${detail.message}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                ${results.success > 0 ? `
+                    <div class="mt-6 p-4 bg-green-50 border-l-4 border-green-500 rounded">
+                        <p class="text-green-800 font-semibold">
+                            ✅ ${results.success} prova(s) sincronizada(s) com sucesso!
+                        </p>
+                    </div>
+                ` : ''}
+
+                ${results.errors > 0 ? `
+                    <div class="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
+                        <p class="text-yellow-800 font-semibold">
+                            ⚠️ ${results.errors} arquivo(s) com erro. Verifique os detalhes acima.
+                        </p>
+                    </div>
+                ` : ''}
+            `;
+
+            // Scroll para resultado
+            resultArea.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

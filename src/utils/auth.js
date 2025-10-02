@@ -14,9 +14,9 @@ class SecureAuth {
         this.lockoutKey = 'auth_lockout';
 
         // Hashes seguros das senhas (gerados com SHA-256)
-        // Para produção, estas devem vir de variáveis de ambiente
-        this.adminPasswordHash = '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'; // 'hello'
-        this.unlockPasswordHash = '787600ebe6d6c75b6bc0b2db0bfd6aeec78897b67d3192e2208bc8b714237841'; // 'unlock'
+        // Senhas atuais: admin123 / unlock123
+        this.adminPasswordHash = '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'; // 'admin123'
+        this.unlockPasswordHash = '57c3403f84f921ade3dbc0c6059501c87c5d3b6b04fa6635c709c3a0c1c5e7d1'; // 'unlock123'
 
         // Rate limiting
         this.attempts = this.getAttempts();
