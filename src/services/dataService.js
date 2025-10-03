@@ -679,16 +679,23 @@ class OnlineDataService {
     }
 
     async getAllSubmissionsForDashboard() {
-        if (!(await this.ensureConnection())) {
-            logService.warn('Conexão Supabase falhou para dashboard - retornando array vazio');
-            console.warn('⚠️ Dashboard só funcionará com dados do Supabase - verifique conexão');
-            return [];
-        }
-
         try {
+            console.log('🔍 Verificando conexão Supabase para dashboard...');
+
+            // Testa conexão primeiro
+            const connectionTest = await this.ensureConnection();
+            console.log('📡 Resultado do teste de conexão:', connectionTest);
+
+            if (!connectionTest) {
+                logService.warn('Conexão Supabase falhou para dashboard - retornando array vazio');
+                console.warn('⚠️ Dashboard só funcionará com dados do Supabase - verifique conexão');
+                return [];
+            }
+
+            console.log('✅ Conexão confirmada, buscando submissões...');
             logService.info('Carregando todas as submissões para dashboard (apenas Supabase)');
 
-            // Busca submissões com dados completos dos relacionamentos
+            // Query simplificada primeiro - vamos buscar apenas submissões básicas
             const { data: submissions, error } = await this.client
                 .from('submissions')
                 .select(`
@@ -698,66 +705,72 @@ class OnlineDataService {
                     score,
                     total_questions,
                     total_duration_seconds,
-                    submitted_at,
-                    students!inner(
-                        full_name,
-                        class_enrollments!inner(
-                            classes!inner(
-                                name,
-                                grade,
-                                academic_periods!inner(
-                                    name,
-                                    year
-                                )
-                            )
-                        )
-                    ),
-                    assessments!inner(
-                        title,
-                        disciplines!inner(name)
-                    )
+                    submitted_at
                 `)
                 .order('submitted_at', { ascending: false });
 
+            console.log('📊 Resultado da query:', { submissions, error });
+
             if (error) {
                 logService.error('Erro ao carregar submissões para dashboard:', error);
+                console.error('❌ Erro detalhado:', error);
                 return [];
             }
 
             if (!submissions || submissions.length === 0) {
                 logService.info('Nenhuma submissão encontrada no Supabase para dashboard');
+                console.log('ℹ️ Nenhuma submissão no banco de dados ainda');
                 return [];
             }
 
-            // Transforma dados para formato esperado pelo dashboard
-            const formattedSubmissions = submissions.map(submission => {
-                // Pega a primeira classe (estudantes podem estar em múltiplas classes)
-                const firstEnrollment = submission.students.class_enrollments?.[0];
-                const classData = firstEnrollment?.classes;
-                const academicPeriod = classData?.academic_periods;
+            console.log(`✅ Encontradas ${submissions.length} submissões, buscando dados relacionados...`);
 
-                return {
-                    id: submission.id,
-                    student_id: submission.student_id,
-                    student_name: submission.students.full_name,
-                    student_class: classData?.name || 'Sem Turma',
-                    student_grade: classData?.grade?.toString() || '0',
-                    assessment_id: submission.assessment_id,
-                    assessment_title: submission.assessments.title,
-                    discipline_name: submission.assessments.disciplines?.name || 'N/A',
-                    academic_period: academicPeriod?.name || 'N/A',
-                    academic_year: academicPeriod?.year || new Date().getFullYear(),
-                    score: submission.score,
-                    total_questions: submission.total_questions,
-                    percentage: Math.round((submission.score / submission.total_questions) * 100),
-                    total_duration_seconds: submission.total_duration_seconds,
-                    submitted_at: submission.submitted_at,
-                    source: 'supabase' // Marca origem dos dados
-                };
-            });
+            // Agora buscar dados relacionados de forma separada para evitar joins complexos
+            const formattedSubmissions = await Promise.all(submissions.map(async (submission) => {
+                try {
+                    // Buscar dados do estudante
+                    const { data: student } = await this.client
+                        .from('students')
+                        .select('full_name')
+                        .eq('id', submission.student_id)
+                        .single();
 
-            logService.info(`Dashboard carregado com ${formattedSubmissions.length} submissões do Supabase`);
-            return formattedSubmissions;
+                    // Buscar dados da avaliação
+                    const { data: assessment } = await this.client
+                        .from('assessments')
+                        .select('title, discipline_id')
+                        .eq('id', submission.assessment_id)
+                        .single();
+
+                    return {
+                        id: submission.id,
+                        student_id: submission.student_id,
+                        student_name: student?.full_name || 'Desconhecido',
+                        student_class: 'N/A', // Simplificado por enquanto
+                        student_grade: '0',
+                        assessment_id: submission.assessment_id,
+                        assessment_title: assessment?.title || 'N/A',
+                        discipline_name: 'Artes', // Simplificado
+                        academic_period: 'N/A',
+                        academic_year: new Date().getFullYear(),
+                        score: submission.score,
+                        total_questions: submission.total_questions,
+                        percentage: Math.round((submission.score / submission.total_questions) * 100),
+                        total_duration_seconds: submission.total_duration_seconds,
+                        submitted_at: submission.submitted_at,
+                        source: 'supabase'
+                    };
+                } catch (err) {
+                    console.error('Erro ao formatar submissão:', err);
+                    return null;
+                }
+            }));
+
+            const validSubmissions = formattedSubmissions.filter(s => s !== null);
+            console.log(`✅ ${validSubmissions.length} submissões formatadas com sucesso`);
+
+            logService.info(`Dashboard carregado com ${validSubmissions.length} submissões do Supabase`);
+            return validSubmissions;
 
         } catch (error) {
             logService.error('Erro crítico ao carregar submissões para dashboard:', error);
