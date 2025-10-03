@@ -6,7 +6,9 @@ import { logService } from './logService.js';
 // Detecta automaticamente o servidor local
 const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:8000'
-    : `http://${window.location.hostname}:${window.location.port || 8000}`;
+    : window.location.protocol === 'https:'
+        ? `https://${window.location.hostname}`  // HTTPS sem porta (Render usa porta 443 por padrão)
+        : `http://${window.location.hostname}:${window.location.port || 8000}`;
 
 console.log(`🌐 Cliente configurado para: ${SERVER_URL}`);
 
