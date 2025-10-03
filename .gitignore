@@ -1,15 +1,36 @@
-# Arquivo de configuração com chaves secretas
-src/config.js
+# ═══════════════════════════════════════════════════════════
+#  ARQUIVOS E PASTAS A IGNORAR NO GIT
+# ═══════════════════════════════════════════════════════════
 
-# Arquivos de ambiente padrão
+# 🔐 Arquivos sensíveis (NUNCA commitar!)
 .env
 .env.local
+.env.production
+config/.env*
 
-# Pasta de dependências (boa prática para o futuro)
+# 📦 Dependências
 node_modules/
-docs/
-database/
 
-# Pasta de arquivos gerados (boa prática para o futuro)
+# 🏗️ Build e cache
 dist/
 build/
+.vercel/
+.netlify/
+.cache/
+
+# 🗂️ Arquivos temporários
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# 🔧 IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 📁 Pastas de dados temporários
+prova_aluno/
+resultados_recebidos/

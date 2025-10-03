@@ -10,7 +10,11 @@ npm install
 ```
 
 ### Passo 2: Configurar credenciais
-Crie um arquivo `.env` com suas credenciais do Supabase:
+Copie o arquivo de exemplo e configure suas credenciais:
+```bash
+cp config/.env.example .env
+```
+Edite `.env` com suas credenciais do Supabase:
 ```env
 VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_ANON_KEY=sua-chave-anonima
@@ -22,7 +26,7 @@ npm start
 ```
 ou execute:
 ```bash
-INICIAR.bat
+tools/INICIAR.bat
 ```
 
 ### Passo 4: Acessar nos Chromebooks
@@ -64,19 +68,28 @@ Acesse `http://192.168.5.1:8000` nos dispositivos conectados à sua rede.
 sistema_avaliativo/
 ├── server.js                    # Servidor Node.js com cache
 ├── index.html                   # Interface principal
-├── INICIAR.bat                  # Script de inicialização
-├── LIBERAR_FIREWALL.bat         # Configuração do firewall
-├── GUIA_COMPLETO.md             # Documentação completa
-├── src/
+├── package.json                 # Dependências
+├── vercel.json                  # Configuração Vercel
+├── netlify.toml                 # Configuração Netlify
+├── src/                         # Código fonte
 │   ├── main.js                  # Ponto de entrada
 │   ├── quiz.js                  # Lógica da avaliação
-│   ├── services/
-│   │   ├── localServerClient.js # Cliente para API local
-│   │   ├── dataService.js       # Serviço unificado de dados
-│   │   └── supabaseClient.js    # Cliente Supabase (fallback)
-│   ├── adaptive/                # Sistema de conteúdo adaptativo
+│   ├── services/                # Serviços de dados
+│   ├── adaptive/                # Conteúdo adaptativo
 │   └── utils/                   # Utilitários diversos
-└── package.json                 # Dependências
+├── styles/                      # Estilos CSS
+├── config/                      # Arquivos de configuração
+│   ├── .env.example             # Exemplo de variáveis
+│   ├── .env.vercel              # Config Vercel
+│   └── netlify.toml             # Config Netlify
+├── tools/                       # Ferramentas utilitárias
+│   ├── INICIAR.bat              # Script de inicialização
+│   ├── importar.html            # Importador de dados
+│   └── gerar-hash-senha.html    # Gerador de senhas
+├── docs/                        # Documentação
+│   ├── deploy/                  # Guias de deploy
+│   └── setup/                   # Guias de configuração
+└── database/                    # Scripts SQL
 ```
 
 ---
@@ -107,7 +120,7 @@ npm run dev
 **Solução:** O servidor agora filtra automaticamente questões pelo ano correto.
 
 ### Chromebooks não conseguem acessar
-1. Execute `LIBERAR_FIREWALL.bat`
+1. Execute `tools/LIBERAR_FIREWALL.bat`
 2. Verifique se todos estão na mesma rede WiFi
 3. Teste: `http://192.168.5.1:8000/api/status`
 
@@ -176,9 +189,14 @@ MIT License - Uso livre para fins educacionais
 ## 🆘 Suporte
 
 Para dúvidas ou problemas:
-1. Consulte `GUIA_COMPLETO.md`
+1. Consulte `docs/GUIA_COMPLETO.md`
 2. Verifique os logs do servidor no terminal
 3. Teste a rota `/api/status` para diagnóstico
+
+## 🚀 Deploy
+
+- **Vercel**: Veja `docs/deploy/DEPLOY_VERCEL.md`
+- **Netlify**: Veja `docs/deploy/DEPLOY_NETLIFY.md`
 
 ---
 

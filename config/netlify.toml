@@ -1,0 +1,68 @@
+# Configuração do Netlify para projeto vanilla (sem build)
+
+[build]
+  # Sem comando de build - projeto usa HTML/CSS/JS puros
+  command = ""
+  # Publica da raiz do projeto onde está o index.html
+  publish = "."
+
+# Configurações de ambiente
+[build.environment]
+  NODE_VERSION = "18"
+
+# SPA redirect apenas para rotas HTML (não para assets)
+# Isso evita que arquivos .js sejam redirecionados para index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+  # Exclui arquivos com extensão conhecida
+  conditions = {path = ["!*.js", "!*.css", "!*.json", "!*.png", "!*.jpg", "!*.svg", "!*.html"]}
+
+# Headers de segurança
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "no-referrer-when-downgrade"
+
+# MIME type correto para módulos JavaScript
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# MIME type correto para módulos JavaScript em subpastas
+[[headers]]
+  for = "/src/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/src/**/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Cache para arquivos CSS
+[[headers]]
+  for = "/styles/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Sem cache para index.html
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Sem cache para importar.html
+[[headers]]
+  for = "/importar.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
