@@ -125,21 +125,23 @@ async function populateStudents(classId) {
         populateSelectWithOptions(dom.login.studentSelect, students, 'Aluno', 'id', 'name', (student) => {
             // Lógica para desabilitar alunos que já concluíram
             const isCompleted = completedStudentIds.has(student.id);
-            const hasAdaptation = hasValidAdaptationDetails(student.adaptation_details);
+            // DESATIVADO TEMPORARIAMENTE - Sistema de adaptação
+            // const hasAdaptation = hasValidAdaptationDetails(student.adaptation_details);
 
-            console.log(`🎯 Estudante ${student.name}: ${isCompleted ? 'BLOQUEADO' : 'DISPONÍVEL'}${hasAdaptation ? ' (Adaptação)' : ''}`);
+            console.log(`🎯 Estudante ${student.name}: ${isCompleted ? 'BLOQUEADO' : 'DISPONÍVEL'}`);
 
             if (isCompleted) {
                 return { disabled: true, textSuffix: ' (Concluído)' };
             }
-            if (hasAdaptation) {
-                const adaptationInfo = getAdaptationSummary(student.adaptation_details);
-                return {
-                    'data-has-adaptation': 'true',
-                    'data-adaptation-info': adaptationInfo,
-                    textSuffix: ' 🎯'
-                };
-            }
+            // DESATIVADO TEMPORARIAMENTE - Sistema de adaptação
+            // if (hasAdaptation) {
+            //     const adaptationInfo = getAdaptationSummary(student.adaptation_details);
+            //     return {
+            //         'data-has-adaptation': 'true',
+            //         'data-adaptation-info': adaptationInfo,
+            //         textSuffix: ' 🎯'
+            //     };
+            // }
             return {};
         });
         clearError();
@@ -208,14 +210,16 @@ function populateSelectWithOptions(selectElement, data, type, valueKey, textKey,
 function handleSelectionChange() {
     const studentSelect = dom.login.studentSelect;
     const selectedOption = studentSelect.options[studentSelect.selectedIndex];
-    
-    if (selectedOption && selectedOption.value) {
-        const hasAdaptation = selectedOption.getAttribute('data-has-adaptation') === 'true';
-        updateAdaptationUI(hasAdaptation ? selectedOption.textContent : null);
-    } else {
-        updateAdaptationUI(null);
-    }
-    
+
+    // DESATIVADO TEMPORARIAMENTE - Sistema de adaptação
+    // if (selectedOption && selectedOption.value) {
+    //     const hasAdaptation = selectedOption.getAttribute('data-has-adaptation') === 'true';
+    //     updateAdaptationUI(hasAdaptation ? selectedOption.textContent : null);
+    // } else {
+    //     updateAdaptationUI(null);
+    // }
+    updateAdaptationUI(null); // Sempre oculta a UI de adaptação
+
     updateStartButtonState();
 }
 
@@ -349,7 +353,9 @@ export function initializeLoginScreen(onStartCallback) {
                     grade: grade,
                     classId: selectedClass.id,
                     className: selectedClass.name,
-                    adaptationDetails: selectedStudent.adaptation_details
+                    // DESATIVADO TEMPORARIAMENTE - Sistema de adaptação
+                    // adaptationDetails: selectedStudent.adaptation_details
+                    adaptationDetails: null
                 }
             });
 
