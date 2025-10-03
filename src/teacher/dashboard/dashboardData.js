@@ -1,5 +1,5 @@
 // src/teacher/dashboard/dashboardData.js - Lógica de dados do dashboard
-import { dataService } from '../../services/dataService.js';
+import { getDataService } from '../../services/dataService.js';
 
 export class DashboardData {
     constructor() {
@@ -8,6 +8,7 @@ export class DashboardData {
 
     async loadAllResults() {
         console.log('📊 Dashboard carregando dados APENAS do Supabase (fonte única)');
+        const dataService = await getDataService();
         const results = await dataService.getAllSubmissionsForDashboard();
 
         if (!Array.isArray(results)) {
@@ -30,6 +31,7 @@ export class DashboardData {
         }
 
         console.log(`📝 Carregando respostas do Supabase para submissão: ${submissionId}`);
+        const dataService = await getDataService();
         const answers = await dataService.getSubmissionAnswers(submissionId);
         this.cache.set(submissionId, answers);
 
