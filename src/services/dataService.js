@@ -1151,6 +1151,11 @@ class OfflineDataService {
         // Em modo offline, não temos histórico de submissões
         return [];
     }
+
+    async getAllSubmissionsForDashboard() {
+        logService.warn('Dashboard não disponível em modo offline');
+        return [];
+    }
 }
 
 /**
@@ -1204,6 +1209,17 @@ class LocalServerDataService {
             logService.warn('Servidor local falhou para submissões completadas', error);
             return [];
         }
+    }
+
+    async getAllSubmissionsForDashboard() {
+        // Servidor local não suporta dashboard ainda
+        // Fallback para Supabase direto
+        logService.warn('Dashboard requer Supabase direto - servidor local não suporta ainda');
+        if (isSupabaseAvailable()) {
+            const supabaseService = new OnlineDataService(getSupabaseClient());
+            return await supabaseService.getAllSubmissionsForDashboard();
+        }
+        return [];
     }
 }
 
