@@ -1286,6 +1286,17 @@ class LocalServerDataService {
         }
         return [];
     }
+
+    async getSubmissionAnswers(submissionId) {
+        // Dashboard precisa das respostas detalhadas
+        // Fallback para Supabase direto
+        logService.warn('getSubmissionAnswers requer Supabase direto - servidor local não suporta ainda');
+        if (isSupabaseAvailable()) {
+            const supabaseService = new OnlineDataService(getSupabaseClient());
+            return await supabaseService.getSubmissionAnswers(submissionId);
+        }
+        return [];
+    }
 }
 
 /**
