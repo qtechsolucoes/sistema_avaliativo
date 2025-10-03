@@ -209,44 +209,44 @@ export class DashboardFilters {
         });
     }
 
-    handleYearChange() {
+    async handleYearChange() {
         const yearFilter = dom.dashboard.yearFilter?.value;
-        
+
         logService.debug('Filtro de ano alterado', { year: yearFilter });
-        
+
         // Atualiza as opções de turma baseado no ano selecionado
         this.populateClassFilter(state.allResultsData || []);
-        
+
         // Aplica os filtros
-        this.applyFilters();
-        
+        await this.applyFilters();
+
         this.lastYearFilter = yearFilter;
     }
 
-    handleClassChange() {
+    async handleClassChange() {
         const classFilter = dom.dashboard.classFilter?.value;
-        
+
         logService.debug('Filtro de turma alterado', { class: classFilter });
-        
-        this.applyFilters();
-        
+
+        await this.applyFilters();
+
         this.lastClassFilter = classFilter;
     }
 
-    applyFilters() {
+    async applyFilters() {
         const yearFilter = dom.dashboard.yearFilter?.value || 'all';
         const classFilter = dom.dashboard.classFilter?.value || 'all';
-        
+
         // Determina o tipo de visualização
         if (yearFilter === 'compare_years') {
-            this.dashboardManager.showYearComparison();
+            await this.dashboardManager.showYearComparison();
         } else if (classFilter === 'compare_classes') {
-            this.dashboardManager.showClassComparison(yearFilter);
+            await this.dashboardManager.showClassComparison(yearFilter);
         } else {
             // Filtro normal
-            this.dashboardManager.applyFilters(yearFilter, classFilter);
+            await this.dashboardManager.applyFilters(yearFilter, classFilter);
         }
-        
+
         // Salva preferências do usuário
         this.saveFilterPreferences(yearFilter, classFilter);
     }
@@ -282,23 +282,23 @@ export class DashboardFilters {
         }
     }
 
-    restoreFilterPreferences() {
+    async restoreFilterPreferences() {
         const preferences = this.loadFilterPreferences();
         if (!preferences) return;
-        
+
         const yearFilter = dom.dashboard.yearFilter;
         const classFilter = dom.dashboard.classFilter;
-        
+
         if (yearFilter && this.optionExists(yearFilter, preferences.yearFilter)) {
             yearFilter.value = preferences.yearFilter;
-            this.handleYearChange();
+            await this.handleYearChange();
         }
-        
+
         if (classFilter && this.optionExists(classFilter, preferences.classFilter)) {
             classFilter.value = preferences.classFilter;
-            this.handleClassChange();
+            await this.handleClassChange();
         }
-        
+
         logService.debug('Preferências de filtros restauradas', preferences);
     }
 
@@ -306,25 +306,25 @@ export class DashboardFilters {
         return Array.from(selectElement.options).some(option => option.value === value);
     }
 
-    reset() {
+    async reset() {
         const yearFilter = dom.dashboard.yearFilter;
         const classFilter = dom.dashboard.classFilter;
-        
+
         if (yearFilter) {
             yearFilter.value = 'all';
         }
-        
+
         if (classFilter) {
             classFilter.value = 'all';
         }
-        
+
         this.lastYearFilter = null;
         this.lastClassFilter = null;
-        
+
         localStorage.removeItem('dashboardFilters');
-        
-        this.applyFilters();
-        
+
+        await this.applyFilters();
+
         logService.debug('Filtros resetados');
     }
 
@@ -368,9 +368,9 @@ export class DashboardFilters {
         };
     }
 
-    importFilterState(state) {
+    async importFilterState(state) {
         if (!state) return;
-        
+
         // Restaura mapa de turmas
         if (state.classesMap) {
             this.classesMap.clear();
@@ -378,27 +378,27 @@ export class DashboardFilters {
                 this.classesMap.set(parseInt(year), new Set(classes));
             });
         }
-        
+
         // Restaura últimos filtros
         this.lastYearFilter = state.lastYearFilter;
         this.lastClassFilter = state.lastClassFilter;
-        
+
         // Aplica filtros ativos
         if (state.activeFilters) {
             const yearFilter = dom.dashboard.yearFilter;
             const classFilter = dom.dashboard.classFilter;
-            
+
             if (yearFilter && state.activeFilters.year) {
                 yearFilter.value = state.activeFilters.year;
             }
-            
+
             if (classFilter && state.activeFilters.class) {
                 classFilter.value = state.activeFilters.class;
             }
-            
-            this.applyFilters();
+
+            await this.applyFilters();
         }
-        
+
         logService.debug('Estado dos filtros importado', state);
     }
 

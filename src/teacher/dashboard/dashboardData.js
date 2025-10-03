@@ -25,17 +25,29 @@ export class DashboardData {
     }
 
     async loadAnswersForSubmission(submissionId) {
-        // Verifica cache
-        if (this.cache.has(submissionId)) {
-            return this.cache.get(submissionId);
+        try {
+            // Verifica cache
+            if (this.cache.has(submissionId)) {
+                return this.cache.get(submissionId);
+            }
+
+            console.log(`📝 Carregando respostas do Supabase para submissão: ${submissionId}`);
+            const dataService = await getDataService();
+            const answers = await dataService.getSubmissionAnswers(submissionId);
+
+            if (!answers || !Array.isArray(answers)) {
+                console.warn(`⚠️ Respostas inválidas retornadas para ${submissionId}`);
+                this.cache.set(submissionId, []);
+                return [];
+            }
+
+            this.cache.set(submissionId, answers);
+            return answers;
+        } catch (error) {
+            console.error(`❌ Erro ao carregar respostas para ${submissionId}:`, error);
+            this.cache.set(submissionId, []);
+            return [];
         }
-
-        console.log(`📝 Carregando respostas do Supabase para submissão: ${submissionId}`);
-        const dataService = await getDataService();
-        const answers = await dataService.getSubmissionAnswers(submissionId);
-        this.cache.set(submissionId, answers);
-
-        return answers;
     }
 
     calculateStats(results) {
@@ -121,34 +133,44 @@ export class DashboardData {
 
     async getQuestionStatistics(results) {
         const questionStats = {};
-        
+
         for (const result of results) {
-            const answers = await this.loadAnswersForSubmission(result.id);
-            
-            answers.forEach(answer => {
-                const qId = answer.question_id;
-                
-                if (!questionStats[qId]) {
-                    questionStats[qId] = {
-                        text: answer.questions?.question_text || `Questão ${qId}`,
-                        correct: 0,
-                        incorrect: 0,
-                        totalTime: 0,
-                        count: 0
-                    };
+            try {
+                const answers = await this.loadAnswersForSubmission(result.id);
+
+                if (!answers || !Array.isArray(answers)) {
+                    console.warn(`⚠️ Respostas inválidas para submissão ${result.id}`);
+                    continue;
                 }
-                
-                if (answer.is_correct) {
-                    questionStats[qId].correct++;
-                } else {
-                    questionStats[qId].incorrect++;
-                }
-                
-                questionStats[qId].totalTime += answer.duration_seconds || 0;
-                questionStats[qId].count++;
-            });
+
+                answers.forEach(answer => {
+                    const qId = answer.question_id;
+
+                    if (!questionStats[qId]) {
+                        questionStats[qId] = {
+                            text: answer.questions?.question_text || `Questão ${qId}`,
+                            correct: 0,
+                            incorrect: 0,
+                            totalTime: 0,
+                            count: 0
+                        };
+                    }
+
+                    if (answer.is_correct) {
+                        questionStats[qId].correct++;
+                    } else {
+                        questionStats[qId].incorrect++;
+                    }
+
+                    questionStats[qId].totalTime += answer.duration_seconds || 0;
+                    questionStats[qId].count++;
+                });
+            } catch (error) {
+                console.error(`❌ Erro ao processar respostas da submissão ${result.id}:`, error);
+                continue;
+            }
         }
-        
+
         return questionStats;
     }
 }

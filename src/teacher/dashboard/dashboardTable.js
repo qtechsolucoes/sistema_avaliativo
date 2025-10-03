@@ -3,7 +3,7 @@ import { dom } from '../../state.js';
 
 export class DashboardTable {
     constructor() {
-        this.sortField = 'date';
+        this.sortField = 'score';
         this.sortDirection = 'desc';
         this.setupSortListeners();
     }
@@ -22,24 +22,24 @@ export class DashboardTable {
         });
     }
 
-    render(results, sortMode = 'default') {
+    render(results, sortMode = 'score') {
         const tbody = dom.dashboard.tableBody;
         if (!tbody) return;
 
         tbody.innerHTML = '';
-        
+
         if (results.length === 0) {
             this.showEmptyState();
             return;
         }
-        
+
         const sortedResults = this.sortResults(results, sortMode);
-        
+
         sortedResults.forEach(result => {
             const row = this.createResultRow(result);
             tbody.appendChild(row);
         });
-        
+
         this.updateTableHeaders();
     }
 

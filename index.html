@@ -776,15 +776,16 @@
                     </div>
                 </div>
                 <div>
-                    <h3 class="text-xl font-bold mb-4">Resultados Individuais</h3>
+                    <h3 class="text-xl font-bold mb-4">Resultados Individuais (Ordenado por Nota)</h3>
                     <div class="overflow-x-auto border rounded-lg">
                         <table class="w-full text-left">
                             <thead class="bg-slate-50 text-sm">
                                 <tr>
                                     <th class="p-3 font-semibold">Aluno</th>
-                                    <th class="p-3 font-semibold">Avaliação</th>
+                                    <th class="p-3 font-semibold text-center">Ano</th>
+                                    <th class="p-3 font-semibold text-center">Turma</th>
                                     <th class="p-3 font-semibold">Nota</th>
-                                    <th class="p-3 font-semibold">Duração</th>
+                                    <th class="p-3 font-semibold text-center">Duração</th>
                                     <th class="p-3 font-semibold">Data</th>
                                 </tr>
                             </thead>
@@ -803,6 +804,29 @@
                 <div class="flex justify-between gap-4">
                     <button id="cancel-finish-btn" class="btn btn-secondary w-1/2">Cancelar</button>
                     <button id="confirm-finish-btn" class="btn btn-primary w-1/2">Finalizar Prova</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Carregamento do Dashboard -->
+        <div id="dashboard-loading-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+                <div class="mb-6">
+                    <svg class="animate-spin h-16 w-16 mx-auto text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800 mb-3">Carregando Dados</h2>
+                <p class="text-slate-600 mb-4" id="dashboard-loading-message">Buscando submissões do banco de dados...</p>
+                <div class="bg-slate-100 rounded-lg p-4 mt-4">
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-slate-600">Progresso:</span>
+                        <span class="font-bold text-blue-600" id="dashboard-loading-progress">0%</span>
+                    </div>
+                    <div class="w-full bg-slate-300 rounded-full h-2 mt-2">
+                        <div id="dashboard-loading-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
                 </div>
             </div>
         </div>

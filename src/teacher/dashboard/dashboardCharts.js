@@ -7,10 +7,14 @@ export class DashboardCharts {
         this.dataProcessor = new DashboardData();
     }
 
-    renderAll(results) {
-        this.renderScoreDistribution(results);
-        this.renderQuestionDifficulty(results);
-        this.renderTimePerQuestion(results);
+    async renderAll(results) {
+        try {
+            this.renderScoreDistribution(results);
+            await this.renderQuestionDifficulty(results);
+            await this.renderTimePerQuestion(results);
+        } catch (error) {
+            console.error('❌ Erro ao renderizar gráficos do dashboard:', error);
+        }
     }
 
     renderScoreDistribution(results) {
@@ -27,40 +31,48 @@ export class DashboardCharts {
     }
 
     async renderQuestionDifficulty(results) {
-        const canvas = document.getElementById('question-difficulty-chart');
-        if (!canvas) return;
+        try {
+            const canvas = document.getElementById('question-difficulty-chart');
+            if (!canvas) return;
 
-        const stats = await this.dataProcessor.getQuestionStatistics(results);
-        const data = this.prepareQuestionDifficultyData(stats);
-        
-        this.createChart(canvas, 'bar', data, {
-            responsive: true,
-            scales: {
-                x: { stacked: true },
-                y: { stacked: true, beginAtZero: true }
-            }
-        });
+            const stats = await this.dataProcessor.getQuestionStatistics(results);
+            const data = this.prepareQuestionDifficultyData(stats);
+
+            this.createChart(canvas, 'bar', data, {
+                responsive: true,
+                scales: {
+                    x: { stacked: true },
+                    y: { stacked: true, beginAtZero: true }
+                }
+            });
+        } catch (error) {
+            console.error('❌ Erro ao renderizar gráfico de dificuldade:', error);
+        }
     }
 
     async renderTimePerQuestion(results) {
-        const canvas = document.getElementById('time-per-question-chart');
-        if (!canvas) return;
+        try {
+            const canvas = document.getElementById('time-per-question-chart');
+            if (!canvas) return;
 
-        const stats = await this.dataProcessor.getQuestionStatistics(results);
-        const data = this.prepareTimeData(stats);
-        
-        this.createChart(canvas, 'bar', data, {
-            responsive: true,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Segundos'
+            const stats = await this.dataProcessor.getQuestionStatistics(results);
+            const data = this.prepareTimeData(stats);
+
+            this.createChart(canvas, 'bar', data, {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Segundos'
+                        }
                     }
                 }
-            }
-        });
+            });
+        } catch (error) {
+            console.error('❌ Erro ao renderizar gráfico de tempo:', error);
+        }
     }
 
     prepareScoreDistributionData(results) {

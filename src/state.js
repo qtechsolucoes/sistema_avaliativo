@@ -72,7 +72,11 @@ export const dom = {
         totalAssessments: document.getElementById('total-assessments'),
         totalStudents: document.getElementById('total-students'),
         tableBody: document.getElementById('results-table-body'),
-        charts: {}
+        charts: {},
+        loadingModal: document.getElementById('dashboard-loading-modal'),
+        loadingMessage: document.getElementById('dashboard-loading-message'),
+        loadingProgress: document.getElementById('dashboard-loading-progress'),
+        loadingBar: document.getElementById('dashboard-loading-bar')
     },
     modal: {
         overlay: document.getElementById('confirmation-modal-overlay'),

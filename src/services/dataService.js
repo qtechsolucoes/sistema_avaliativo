@@ -8,27 +8,39 @@ import { localServerClient } from './localServerClient.js';
 /**
  * Serviço de dados online (Supabase)
  */
+
+// Cache global de conexão compartilhado entre todas as instâncias
+let globalConnectionStatus = null;
+
 class OnlineDataService {
     constructor(client) {
         this.client = client;
-        this.isConnected = false;
     }
 
     async ensureConnection() {
-        if (!this.isConnected) {
-            this.isConnected = await testSupabaseConnection();
+        // Usa cache global compartilhado entre todas as instâncias
+        if (globalConnectionStatus === null) {
+            console.log('🔌 Testando conexão Supabase pela primeira vez (cache global)...');
+            globalConnectionStatus = await testSupabaseConnection();
+            console.log('🔌 Resultado do teste de conexão (cache global):', globalConnectionStatus);
+        } else {
+            console.log('✅ Conexão já estabelecida anteriormente (cache global)');
         }
-        return this.isConnected;
+        return globalConnectionStatus;
     }
 
     async getClassesByGrade(grade, periodName = "3º Bimestre", year = 2025) {
-        if (!(await this.ensureConnection())) {
+        const connectionStatus = await this.ensureConnection();
+        console.log('🔍 Status da conexão no getClassesByGrade:', connectionStatus);
+
+        if (!connectionStatus) {
             logService.warn('Conexão Supabase falhou, usando dados mock para turmas');
             return mockDataService.getClassesByGrade(grade);
         }
 
         try {
             logService.info('Buscando turmas no Supabase', { grade, periodName, year });
+            console.log('📋 Parâmetros de busca:', { grade, periodName, year });
 
             // Busca período acadêmico
             const { data: period, error: periodError } = await this.client
@@ -38,15 +50,21 @@ class OnlineDataService {
                 .eq('name', periodName)
                 .maybeSingle();
 
+            console.log('📅 Resultado da busca de período:', { period, periodError });
+
             if (periodError) {
                 logService.warn('Erro ao buscar período acadêmico', periodError);
+                console.error('❌ Erro detalhado do período:', periodError);
                 return mockDataService.getClassesByGrade(grade);
             }
 
             if (!period) {
                 logService.warn('Período acadêmico não encontrado', { year, periodName });
+                console.warn('⚠️ Período não existe no banco:', { year, periodName });
                 return mockDataService.getClassesByGrade(grade);
             }
+
+            console.log('✅ Período encontrado:', period);
 
             // Busca turmas
             const { data: classes, error } = await this.client
@@ -56,16 +74,22 @@ class OnlineDataService {
                 .eq('academic_period_id', period.id)
                 .order('name');
 
+            console.log('🏫 Resultado da busca de turmas:', { classes, error });
+
             if (error) {
                 logService.error('Erro ao buscar turmas', error);
+                console.error('❌ Erro detalhado das turmas:', error);
                 return mockDataService.getClassesByGrade(grade);
             }
 
             logService.info(`Encontradas ${classes?.length || 0} turmas no Supabase`);
+            console.log(`✅ ${classes?.length || 0} turmas encontradas`);
+
             return classes?.length > 0 ? classes : mockDataService.getClassesByGrade(grade);
 
         } catch (error) {
             logService.error('Falha crítica ao buscar turmas', error);
+            console.error('💥 Exceção crítica:', error);
             return mockDataService.getClassesByGrade(grade);
         }
     }
@@ -735,10 +759,38 @@ class OnlineDataService {
                         .eq('id', submission.student_id)
                         .single();
 
+                    // Buscar turma do estudante através de class_enrollments
+                    const { data: enrollment } = await this.client
+                        .from('class_enrollments')
+                        .select(`
+                            class_id,
+                            classes:class_id (
+                                name,
+                                grade,
+                                academic_period_id
+                            )
+                        `)
+                        .eq('student_id', submission.student_id)
+                        .order('enrollment_date', { ascending: false })
+                        .limit(1)
+                        .single();
+
                     // Buscar dados da avaliação
                     const { data: assessment } = await this.client
                         .from('assessments')
-                        .select('title, discipline_id')
+                        .select(`
+                            title,
+                            grade,
+                            discipline_id,
+                            disciplines:discipline_id (
+                                name
+                            ),
+                            academic_period_id,
+                            academic_periods:academic_period_id (
+                                name,
+                                year
+                            )
+                        `)
                         .eq('id', submission.assessment_id)
                         .single();
 
@@ -746,13 +798,13 @@ class OnlineDataService {
                         id: submission.id,
                         student_id: submission.student_id,
                         student_name: student?.full_name || 'Desconhecido',
-                        student_class: 'N/A', // Simplificado por enquanto
-                        student_grade: '0',
+                        student_class: enrollment?.classes?.name || 'N/A',
+                        student_grade: enrollment?.classes?.grade?.toString() || assessment?.grade?.toString() || '0',
                         assessment_id: submission.assessment_id,
                         assessment_title: assessment?.title || 'N/A',
-                        discipline_name: 'Artes', // Simplificado
-                        academic_period: 'N/A',
-                        academic_year: new Date().getFullYear(),
+                        discipline_name: assessment?.disciplines?.name || 'N/A',
+                        academic_period: assessment?.academic_periods?.name || 'N/A',
+                        academic_year: assessment?.academic_periods?.year || new Date().getFullYear(),
                         score: submission.score,
                         total_questions: submission.total_questions,
                         percentage: Math.round((submission.score / submission.total_questions) * 100),

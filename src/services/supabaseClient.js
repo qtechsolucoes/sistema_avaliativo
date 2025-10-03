@@ -90,8 +90,22 @@ export async function testSupabaseConnection() {
             .select('id')
             .limit(1);
 
+        console.log('📊 Resultado do teste:', { data, error, hasData: !!data, hasError: !!error });
+
         if (error) {
-            console.warn('⚠️ Erro ao testar conexão Supabase:', error.message);
+            console.warn('⚠️ Erro ao testar conexão Supabase:', error);
+            console.warn('🔍 Detalhes do erro:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint
+            });
+            // Mesmo com erro, se conseguiu fazer a requisição, a conexão existe
+            // O erro pode ser de permissão, não de conectividade
+            if (error.code && error.code !== 'PGRST301') {
+                console.log('✅ Conexão existe, mas há erro de permissão/dados');
+                return true; // Conexão funciona, problema é permissão
+            }
             return false;
         }
 
@@ -99,7 +113,7 @@ export async function testSupabaseConnection() {
         return true;
 
     } catch (error) {
-        console.warn('⚠️ Falha na conexão com Supabase:', error.message);
+        console.warn('⚠️ Falha na conexão com Supabase:', error);
         return false;
     }
 }
