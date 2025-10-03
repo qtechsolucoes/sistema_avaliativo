@@ -193,10 +193,29 @@ Para dúvidas ou problemas:
 2. Verifique os logs do servidor no terminal
 3. Teste a rota `/api/status` para diagnóstico
 
-## 🚀 Deploy
+## 🚀 Deploy Online
 
-- **Vercel**: Veja `docs/deploy/DEPLOY_VERCEL.md`
-- **Netlify**: Veja `docs/deploy/DEPLOY_NETLIFY.md`
+### 🌟 Render.com (RECOMENDADO)
+Deploy simples e funciona perfeitamente com Node.js!
+
+```bash
+# 1. Push para GitHub
+git push origin main
+
+# 2. Siga o guia completo
+```
+📖 **Guia completo:** `docs/deploy/DEPLOY_RENDER.md`
+
+✅ Funciona de primeira
+✅ Sem erros 404
+✅ HTTPS grátis
+✅ Deploy automático
+
+---
+
+### Outras opções:
+- **Vercel**: `docs/deploy/DEPLOY_VERCEL.md` (pode dar problemas)
+- **Netlify**: `docs/deploy/DEPLOY_NETLIFY.md` (apenas estático)
 
 ---
 
