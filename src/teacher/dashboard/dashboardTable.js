@@ -148,7 +148,16 @@ export class DashboardTable {
                 sorted.sort((a, b) => {
                     const scoreA = a.score / a.total_questions;
                     const scoreB = b.score / b.total_questions;
-                    return scoreB - scoreA;
+
+                    // Primeiro compara por nota (maior para menor)
+                    if (scoreB !== scoreA) {
+                        return scoreB - scoreA;
+                    }
+
+                    // Se notas forem iguais, desempata por tempo (menor para maior)
+                    const timeA = a.total_duration_seconds || 999999;
+                    const timeB = b.total_duration_seconds || 999999;
+                    return timeA - timeB;
                 });
                 break;
                 
